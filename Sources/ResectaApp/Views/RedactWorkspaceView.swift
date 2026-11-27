@@ -174,6 +174,8 @@ struct RedactWorkspaceView: View {
     /// dialog cannot present over the sheet, so the drop is refused with
     /// the import gate's sentence, naming the sheet's Dismiss.
     static let dropOverSheetRefusal: MessageID = .importBlockedOnThisScreen(wayBack: "Dismiss")
+    /// Over the stop at Redact the way back is its Cancel.
+    static let dropOverStopRefusal: MessageID = .importBlockedOnThisScreen(wayBack: BeforeYouRedactSheet.cancelTitle)
 
     /// Whether a drop owes the replace dialog: a document is open and it
     /// holds work by the Close dialog's own rule
@@ -198,6 +200,11 @@ struct RedactWorkspaceView: View {
         }
         guard dropNeedsConfirm(documentState: documentState, redactionState: redactionState) else {
             return .importNow
+        }
+        // The stop at Redact is refused under today's sentence until its own has a row.
+        if DocumentEditorView.sheetSlotShowsStop(
+            stopAwaitsAnswer: DocumentEditorView.stopAwaitsAnswer(documentState), phaseKind: documentState.phaseKind) {
+            return .refuse(dropOverStopRefusal)
         }
         return DocumentEditorView.sheetSlotIsPresenting(redactionState)
             ? .refuse(dropOverSheetRefusal)

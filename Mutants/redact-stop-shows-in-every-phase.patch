@@ -1,0 +1,19 @@
+Property: The slot shows the stop only while editing.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BeforeYouRedactSheetTests
+Must go red: ResectaAppTests/BeforeYouRedactSheetTests onlyWhileEditing
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
+index 7bdb205f7..ba2ab8a91 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
+@@ -10,7 +10,7 @@ extension DocumentEditorView {
+     /// and the document is being edited. The slot's getter asks it first;
+     /// the editor's presenting flag, the park and the drop door read it.
+     static func sheetSlotShowsStop(stopAwaitsAnswer: Bool, phaseKind: DocumentState.PhaseKind) -> Bool {
+-        stopAwaitsAnswer && phaseKind == .editing
++        stopAwaitsAnswer
+     }
+ 
+     /// The stop's case is the refusal awaiting an answer.

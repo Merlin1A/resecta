@@ -134,7 +134,7 @@ struct CanvasInkLookTests {
     private static func box(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat,
                             paint: CGRect? = nil, selected: Bool = false, id: UUID = UUID()) -> InkBox {
         let tight = CGRect(x: x, y: y, width: w, height: h)
-        return InkBox(id: id, tight: tight, paint: paint ?? tight, isSelected: selected)
+        return InkBox(id: id, tight: tight, fill: [paint ?? tight], isSelected: selected)
     }
 
     private static func steps(_ boxes: [InkBox], selectionCount: Int? = nil, handlesActive: Bool = true,

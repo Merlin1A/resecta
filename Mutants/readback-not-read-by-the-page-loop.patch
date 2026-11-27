@@ -1,0 +1,20 @@
+Property: The engine's page loop keeps a file only when its read-back held.
+Area: the read-back of the finished file (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter MetaReadBackTests
+Must go red: RedactionEngineTests/MetaReadBackTests loopStopsOnValues; RedactionEngineTests/MetaReadBackTests loopStopsOnIdentifier
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/ProductionPageLoop.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/ProductionPageLoop.swift
+index 4dcc8692..9f26caf6 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/ProductionPageLoop.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/ProductionPageLoop.swift
+@@ -65,8 +65,7 @@ enum ProductionPageLoop {
+         let written = await reconstructor.writtenPageCount
+         // The coordinator's gate before the rename, both conditions: every
+         // page written, and no information-dictionary literal left part-written.
+-        guard written == pages.count, await reconstructor.infoPatchesWhole,
+-              await reconstructor.metaReadBackHeld else {
++        guard written == pages.count, await reconstructor.infoPatchesWhole else {
+             throw PipelineError.redactionError(.reconstructionFailed)
+         }
+         _ = try FileManager.default.replaceItemAt(outputURL, withItemAt: tempURL)

@@ -76,7 +76,7 @@ extension DocumentSearcher {
                 // Report the skip so the app layer can tell the
                 // user this page's image content was never text-scanned.
                 ocrSkipSink?(pageIndex)
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrSkippedOversize))
+                Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrSkippedOversize))
                 return []
             }
 
@@ -88,7 +88,7 @@ extension DocumentSearcher {
                 sendablePage.page.thumbnail(of: thumbnailSize, for: .cropBox)
             }.value
             guard let cgImage = thumbnail.cgImage else {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
+                Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
                 return []
             }
 
@@ -109,12 +109,12 @@ extension DocumentSearcher {
                 ocrPageCache.insert(lines, fast: fast, for: pageIndex, picture: (cgImage, pixelsPerInch))
                 textLines = lines
             } catch { // LegalPhrases:safe (Swift keyword)
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
+                Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
                 return []
             }
         }
 
-        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr,
+        Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr,
                                              emptyRead: ocrPageCache.emptyRead(for: pageIndex)))
         return textLines
     }

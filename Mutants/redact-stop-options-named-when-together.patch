@@ -1,0 +1,19 @@
+Property: Options are named only for a text whose units stand in different groups.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopGroupsTests
+Must go red: ResectaAppTests/RedactStopGroupsTests optionsNamedOnlyWhenApart
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactStop+Groups.swift b/Sources/ResectaApp/State/RedactStop+Groups.swift
+index e198fe9c..7b50b1f1 100644
+--- a/Sources/ResectaApp/State/RedactStop+Groups.swift
++++ b/Sources/ResectaApp/State/RedactStop+Groups.swift
+@@ -93,7 +93,7 @@ extension RedactStop {
+         }
+         var placesByText: [NamedText: Set<Set<Int>>] = [:]
+         for (unit, places) in groupsByUnit {
+-            placesByText[NamedText(kind: unit.kind, text: unit.text), default: []].insert(places)
++            placesByText[NamedText(kind: unit.kind, text: unit.text), default: []].insert(places.union([unit.hashValue]))
+         }
+         return Set(placesByText.filter { $0.value.count > 1 }.keys)
+     }

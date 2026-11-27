@@ -1,0 +1,18 @@
+Property: A kept file's record says what its read-back saw: the writer's account joins the record with the read-back's outcome.
+Area: the read-back of the finished file (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunRecordInfoDictionaryTests
+Must go red: ResectaAppTests/RunRecordInfoDictionaryTests ordinaryExportRecordsTheReadBack
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+index e9a54f688..e4735fa7c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+@@ -275,7 +275,6 @@ extension RunRecord.Produced {
+     public mutating func record(writer account: RunRecord.Produced) {
+         pageImageDigests = account.pageImageDigests
+         infoDictionary = account.infoDictionary
+-        metaReadBack = account.metaReadBack
+     }
+ }
+ 

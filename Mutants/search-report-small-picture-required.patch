@@ -5,13 +5,13 @@ Must go red: RedactionEngineTests/PageCoverageReportTests smallLogo
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
-index 7cacbac8..63ad9bcf 100644
+index 027e25f7..2f300e26 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
-@@ -25,7 +25,7 @@ extension DocumentSearcher {
+@@ -26,7 +26,7 @@ extension DocumentSearcher {
      ) async -> [SearchResult] {
          guard PageImageCensus.carriesImageContent(page) else {
-             if let sink = pageCoverageSink, let cgPage = page.pageRef, PageImageCensus.largestImagePixelArea(of: cgPage) != nil {
+             if let sink = Self.walkCoverageSink, let cgPage = page.pageRef, PageImageCensus.largestImagePixelArea(of: cgPage) != nil {
 -                sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .belowFloors))
 +                sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required))
              }

@@ -5,7 +5,7 @@ import PDFKit
 @Suite("OCRCacheCoherence", .tags(.search))
 struct OCRCacheCoherenceTests {
 
-    @Test("Text-path LRU eviction removes ocrNormalizedConcat entry in lockstep (N-12)")
+    @Test("Text-path LRU eviction removes ocrNormalizedConcat entry in lockstep")
     func textPathEvictionMaintainsNormalizedConcatParity() async {
         let data = TestFixtures.imageOnlyPDF()
         guard let doc = PDFDocument(data: data) else {
@@ -40,7 +40,7 @@ struct OCRCacheCoherenceTests {
         let postNormKeys = await searcher._testOCRNormalizedConcatKeys
 
         #expect(!postNormKeys.contains(expectedEvictedKey),
-                "Text-path LRU eviction must remove ocrNormalizedConcat[\(expectedEvictedKey)] (N-12 parity)")
+                "Text-path LRU eviction must remove ocrNormalizedConcat[\(expectedEvictedKey)] in step with the cache")
         #expect(postNormKeys.isSubset(of: postCacheKeys),
                 "Every ocrNormalizedConcat key must correspond to an ocrCache key")
         #expect(postCacheKeys.contains(missingIndex),

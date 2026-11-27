@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/SearchReturnRuleSourcePinTests recordSitsBesideTheQ
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/SearchRun.swift b/Sources/ResectaApp/State/SearchRun.swift
-index 10d54d09..c8489c30 100644
+index 8507d6f9..3142088c 100644
 --- a/Sources/ResectaApp/State/SearchRun.swift
 +++ b/Sources/ResectaApp/State/SearchRun.swift
-@@ -154,6 +154,7 @@ import RedactionEngine
+@@ -157,6 +157,7 @@ import RedactionEngine
          // apart by it and dropped, so its late batch can never land
          // in this run's list.
          let run = searchState.beginRun()
@@ -16,11 +16,11 @@ index 10d54d09..c8489c30 100644
  
          // Pre-validate regex before starting search.
          // Surface the rejection reason —
-@@ -210,7 +211,6 @@ import RedactionEngine
+@@ -213,7 +214,6 @@ import RedactionEngine
          }
  
          let mode = buildSearchMode()
 -        searchState.lastRunShape = searchState.currentRunShape  // read in the same stretch as the query above
          searchState.totalPages = liveDoc.pageCount
- 
-         // Snapshot the user-selected preset's
+         searchState.accountReplacedSink = { [weak redactionState] token in
+             redactionState?.recordSearchRunReplaced(token: token)

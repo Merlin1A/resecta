@@ -11,7 +11,7 @@ import CoreGraphics
 //    scan mode IS the Scan interface's machinery), so persistence,
 //    launch args, and saved-search recall need no second field.
 // 2. The toolbar Scan button's one-tap contract rides a one-shot
-//    `pendingAutoRunScan` flag with a single consume site.
+//    `pendingAutoRun` one-shot with a single consume site.
 // 3. An empty category-chip selection means scan EVERYTHING
 //    (`effectiveScanCategories`).
 // 4. The retired per-run confidence slider no longer filters results —
@@ -45,14 +45,14 @@ struct SearchInterfaceChassisTests {
 
     // MARK: - One-tap auto-run flag
 
-    @Test("pendingAutoRunScan defaults false and clear() drops an unconsumed arm")
-    func pendingAutoRunScanLifecycle() {
+    @Test("pendingAutoRun defaults to none and clear() drops an unconsumed arm")
+    func pendingAutoRunLifecycle() {
         let state = SearchState(defaults: UserDefaults(suiteName: "chassis-\(UUID().uuidString)")!)
-        #expect(!state.pendingAutoRunScan)
+        #expect(state.pendingAutoRun == nil)
 
-        state.pendingAutoRunScan = true
+        state.pendingAutoRun = .piiScan
         state.clear()
-        #expect(!state.pendingAutoRunScan,
+        #expect(state.pendingAutoRun == nil,
                 "An armed-but-unconsumed auto-run must not leak into the next sheet session.")
     }
 

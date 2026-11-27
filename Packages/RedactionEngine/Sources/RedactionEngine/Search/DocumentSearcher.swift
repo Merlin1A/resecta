@@ -192,14 +192,24 @@ public actor DocumentSearcher {
     // Side-effect only — never changes which results are yielded.
     var scannedRegionNotAnalyzedSink: (@Sendable (Int) -> Void)?
 
-    // Per-page coverage reporting for the verification
-    // search re-check. Fires for every page a search visits with which
-    // evidence the page was read from (text layer · OCR) or why it was not
-    // read (OCR pixel cap · OCR unavailable · unopenable page). Reporting-
-    // only: it never changes which results are yielded, and it is nil in
-    // every caller except the re-check. May fire more than once per page
-    // (the multi-term OCR path runs per term); consumers dedupe by page.
+    // Per-page coverage reporting. Fires for every page a search visits
+    // with which evidence the page was read from (text layer · OCR) or why
+    // it was not read (OCR pixel cap · OCR unavailable · unopenable page).
+    // Set by the verification search re-check and by the app's Search run,
+    // whose account of what was read is made from these reports; nil in
+    // every other caller. A page is reported as it starts, before it is
+    // matched, so a consumer that stops early must not take a report for a
+    // page past its stop as a read (the app's account does not).
+    // Reporting-only: it never changes which results are yielded. May fire
+    // more than once per page (the multi-term OCR path runs per term);
+    // consumers dedupe by page.
     var pageCoverageSink: (@Sendable (PageSearchCoverage) -> Void)?
+
+    /// The coverage sink as it stood when this walk started, for every report
+    /// the walk makes. A walk reads it, never `pageCoverageSink`, so a walk a
+    /// later run has replaced reports into its own run's sink and not the new
+    /// one's, however long its awaits take.
+    @TaskLocal static var walkCoverageSink: (@Sendable (PageSearchCoverage) -> Void)? = nil
 
     // MARK: - Per-Session Caches
 

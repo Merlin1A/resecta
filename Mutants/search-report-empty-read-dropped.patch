@@ -5,16 +5,16 @@ Must go red: RedactionEngineTests/PageCoverageReportTests emptyRead
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRPages.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRPages.swift
-index 367a3602..85836e1d 100644
+index a73fc162..555bf87b 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRPages.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRPages.swift
 @@ -114,8 +114,7 @@ extension DocumentSearcher {
              }
          }
  
--        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr,
+-        Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr,
 -                                             emptyRead: ocrPageCache.emptyRead(for: pageIndex)))
-+        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
++        Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
          return textLines
      }
  }

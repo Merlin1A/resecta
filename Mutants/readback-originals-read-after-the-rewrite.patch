@@ -1,0 +1,26 @@
+Property: The writer's values are read before they are replaced, so the read-back looks for the writer's, not the fixed ones.
+Area: the read-back of the finished file (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter MetaReadBackTests
+Must go red: RedactionEngineTests/MetaReadBackTests searchablePasses; RedactionEngineTests/MetaReadBackTests securePasses
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+index c4722007..d5ebf7ca 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+@@ -227,7 +227,6 @@ public actor PDFStreamReconstructor {
+         // The writer's own values, read before they are replaced, for the
+         // read-back below. In memory only: they name the system build and
+         // the moment the file was written.
+-        let originals = MetaReadBack.originals(of: tempURL)
+ 
+         // The system writer auto-injects a `/Producer` literal naming
+         // the OS version and build that wrote the file, and `/CreationDate`
+@@ -268,6 +267,7 @@ public actor PDFStreamReconstructor {
+         // The file read back as a whole: the fixed values, the derived
+         // identifier, and none of the writer's own values left in its bytes.
+         // The coordinator keeps the file only when this holds.
++        let originals = MetaReadBack.originals(of: tempURL)
+         _metaReadBack = MetaReadBack.check(url: tempURL, originals: originals)
+         #if DEBUG
+         if Self.readBackAccepts { _metaReadBack = .held }

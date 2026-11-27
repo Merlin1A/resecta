@@ -1,0 +1,19 @@
+Property: Not reached names how its runs ended only when every one ended that way.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopGroupsTests
+Must go red: ResectaAppTests/RedactStopGroupsTests notReachedEnding
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactStop+Groups.swift b/Sources/ResectaApp/State/RedactStop+Groups.swift
+index e198fe9c..dcd3b97a 100644
+--- a/Sources/ResectaApp/State/RedactStop+Groups.swift
++++ b/Sources/ResectaApp/State/RedactStop+Groups.swift
+@@ -36,7 +36,7 @@ extension RedactStop {
+             case .completed, nil: continue
+             }
+         }
+-        if seen.count > 1 { return .differs }
++        if seen.count > 2 { return .differs }
+         return seen.first
+     }
+ 

@@ -451,28 +451,36 @@ struct SkippedShareGateTests {
         }
     }
 
-    // Friction ladder (predicate-level): FAIL > SKIPPED == incomplete-WARN >
-    // WARN == PASS. Score = confirms required + red Share tint.
-    // FAIL scores 2 (confirm + red tint), SKIPPED and incomplete-WARN each
-    // score 1 (confirm, default tint), routine WARN and PASS score 0. Pins
+    // Friction ladder (predicate-level): FAIL == ATTENTION > SKIPPED ==
+    // incomplete-WARN > WARN == PASS. Score = confirms required + Share
+    // demoted under the filled Keep Editing. FAIL and ATTENTION score 2
+    // (confirm + demoted Share), an overridden FAIL too; SKIPPED and
+    // incomplete-WARN each score 1 (confirm, Share not demoted); routine WARN
+    // and PASS score 0. FAIL and ATTENTION are one family as shipped:
+    // `shareNeedsFailConfirm` is `isFail || isAttention`, and the swap names
+    // both. Pins
     // the deliberate shape: turning verification off, or sharing a run whose
     // digest-dependent layers were skipped, are never the least-friction
     // path to sharing.
-    @Test("Friction ladder: FAIL > SKIPPED == incomplete-WARN > WARN == PASS")
+    @Test("Friction ladder: FAIL == ATTENTION > SKIPPED == incomplete-WARN > WARN == PASS")
     func frictionLadderHolds() {
         func friction(_ r: VerificationReport) -> Int {
             (DocumentEditorView.shareNeedsFailConfirm(report: r, acknowledged: false) ? 1 : 0)
                 + (DocumentEditorView.shareNeedsSkippedConfirm(report: r, acknowledged: false) ? 1 : 0)
                 + (DocumentEditorView.shareNeedsIncompleteWarnConfirm(
                     report: r, acknowledged: false) ? 1 : 0)
-                + (VerificationResultsView.shouldTintShareRed(report: r) ? 1 : 0)
+                + (VerificationResultsActions.swapsPrimaryAction(report: r, shareDisabled: false) ? 1 : 0)
         }
         let fail = friction(report(.fail("x")))
+        let failOverridden = friction(report(.fail("x"), overridden: true))
+        let attention = friction(report(.attention("a")))
         let skipped = friction(report(.skipped))
         let incompleteWarn = friction(incompleteWarnReport())
         let warn = friction(report(.warn("w")))
         let pass = friction(report(.pass))
         #expect(fail > skipped)
+        #expect(failOverridden == fail)
+        #expect(attention == fail)
         #expect(skipped == incompleteWarn)
         #expect(incompleteWarn > warn)
         #expect(warn == pass)
@@ -889,38 +897,6 @@ struct IncompleteWarnShareGateTests {
         #expect(doc.incompleteWarnShareAcknowledged == false)
         doc.acknowledgeIncompleteWarnShare()
         #expect(doc.incompleteWarnShareAcknowledged == true)
-    }
-}
-
-// Pins the decoupling fix: Share red-tint keys on overallStatus.isFail ALONE
-// (independent of userOverrodeFailure / share round-trip), and Preview
-// visibility keys on output-existence alone (decoupled from FAIL/override).
-@Suite("Share red-tint + Preview visibility decoupling")
-@MainActor
-struct ShareTintAndPreviewDecouplingTests {
-
-    private func report(_ s: VerificationStatus, overridden: Bool = false) -> VerificationReport {
-        VerificationReport(layers: [], overallStatus: s,
-                           durationSeconds: 0, userOverrodeFailure: overridden)
-    }
-
-    @Test("FAIL (no override) tints Share red")
-    func failPreOverrideTintsRed() {
-        #expect(VerificationResultsView.shouldTintShareRed(report: report(.fail("x"))) == true)
-    }
-
-    @Test("FAIL stays red AFTER override (does not flip on share round-trip)")
-    func failPostOverrideStaysRed() {
-        // Regression lock: the old isFailPreOverride returned false once overridden.
-        #expect(VerificationResultsView.shouldTintShareRed(report: report(.fail("x"), overridden: true)) == true)
-    }
-
-    @Test("Non-FAIL verdicts never tint Share red")
-    func nonFailNeverRed() {
-        #expect(VerificationResultsView.shouldTintShareRed(report: report(.pass)) == false)
-        #expect(VerificationResultsView.shouldTintShareRed(report: report(.warn("w"))) == false)
-        #expect(VerificationResultsView.shouldTintShareRed(report: report(.info("i"))) == false)
-        #expect(VerificationResultsView.shouldTintShareRed(report: report(.skipped)) == false)
     }
 }
 

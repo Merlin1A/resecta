@@ -49,13 +49,13 @@ final class SearchState: Identifiable {
     /// drop, so its run says nothing more). Reset by that run.
     var skipNextRerunNotice = false
 
-    /// One-shot arm for the toolbar Scan button's one-tap contract:
-    /// the button sets this before presenting the sheet, and the
-    /// sheet's `.onAppear` consumes it exactly once to fire the run.
-    /// A single consume site keeps the auto-run to one scan; overlapping
-    /// `triggerSearch()` calls additionally coalesce through the
-    /// single-flight gate below.
-    var pendingAutoRunScan: Bool = false
+    /// One-shot arm for a session that runs as it opens (the toolbar Scan
+    /// button, and the stop's Search These Pages): the mode it was armed
+    /// for, set before the sheet is presented. The sheet's `.onAppear`
+    /// consumes it exactly once and runs only when that mode is still the
+    /// mode in hand. Overlapping `triggerSearch()` calls additionally
+    /// coalesce through the single-flight gate below.
+    var pendingAutoRun: SearchModeType? = nil
 
     // MARK: - Trigger single-flight
 
@@ -470,6 +470,23 @@ final class SearchState: Identifiable {
     /// never dropped by it.
     var runToken: Int = 0
 
+    /// The account of what the run in hand has read (`SearchState+Account.swift`).
+    var accountInHand: SearchAccount?
+    var accountInHandRun: Int = 0
+    var accountInHandToken: UUID?
+    /// True once an Apply took a record from the run in hand.
+    var accountInHandApplied = false
+    /// The last run's closed account, its run and its token.
+    var lastAccount: SearchAccount?
+    var lastAccountRun: Int = 0
+    var lastAccountToken: UUID?
+    /// Where a closed account goes: the document's store, installed by the run.
+    @ObservationIgnored var accountClosedSink: (@MainActor (UUID, SearchAccount) -> Void)?
+    /// Where an opened account's run and query go: the document's run log (`SearchState+RunLog.swift`).
+    @ObservationIgnored var accountOpenedSink: (@MainActor (UUID, AppliedSearchQuery) -> Void)?
+    /// Where a replaced run's kept account is named: it counts at the stop only while its boxes remain.
+    @ObservationIgnored var accountReplacedSink: (@MainActor (UUID) -> Void)?
+
     /// The options the current run started with, which the applied
     /// record names (`appliedSearchRecord()`); nil before any run.
     var lastRunOptions: SearchOptions?
@@ -530,7 +547,7 @@ final class SearchState: Identifiable {
         recentMultiTermSets = []
         activeSearchTask?.cancel()
         activeSearchTask = nil
-        pendingAutoRunScan = false
+        pendingAutoRun = nil
         priorScanFingerprints = nil
         navigationScope = .wholeDocument
         filterFlushTask?.cancel()
@@ -579,6 +596,10 @@ final class SearchState: Identifiable {
     /// `regexError` itself, so the observer can wipe a stale list
     /// without nilling the error it is reacting to.
     private func clearResultState() {
+        // An account still open describes results about to go: it is dropped.
+        closeAccount(.dropped)
+        lastAccount = nil
+        lastAccountToken = nil
         flushTask?.cancel()
         flushTask = nil
         runToken += 1

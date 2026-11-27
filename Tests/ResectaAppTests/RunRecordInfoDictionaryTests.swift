@@ -4,9 +4,10 @@ import Foundation
 @testable import RedactionEngine
 
 // The run's record carries the producer's own account of the export: which
-// way found the information dictionary for the fixed-value rewrite. On an
-// export the system writer made, that is its index. The check never reads
-// it; this test reads it from the run's own value. A file the rewrite left
+// way found the information dictionary for the fixed-value rewrite, and what
+// the read-back of the kept file saw. On an export the system writer made,
+// that is its index, and the read-back held. The check never reads them;
+// these tests read them from the run's own value. A file the rewrite left
 // with part of an old value is never promoted.
 
 @Suite("The run's record says which way found the information dictionary", .serialized, .tags(.coordination))
@@ -23,6 +24,14 @@ struct RunRecordInfoDictionaryTests {
         // same record still holds the box the run painted on page 0.
         #expect(record.produced.paintedRectangles.count == 1,
                 "the record holds \(record.produced.paintedRectangles.count) painted boxes")
+    }
+
+    @Test("An ordinary export's record says its read-back held", .timeLimit(.minutes(3)))
+    func ordinaryExportRecordsTheReadBack() async throws {
+        let coord = try await RunRecordTests.finishedRun()
+        let record = try #require(coord.redactionState.lastRunInputs?.record, "the run keeps its record")
+        #expect(record.produced.metaReadBack == .held,
+                "the record says \(String(describing: record.produced.metaReadBack))")
     }
 
     @Test("A literal left part-written by the rewrite, and not written again whole, promotes no output",

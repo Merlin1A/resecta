@@ -1,0 +1,19 @@
+Property: A file is kept only when both halves of its identifier are the one derived from its bytes.
+Area: the read-back of the finished file (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter MetaReadBackTests
+Must go red: RedactionEngineTests/MetaReadBackTests identifierNotRewrittenStops; RedactionEngineTests/MetaReadBackTests identifierHalfLeftStops
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
+index e74efa51..57fa4caa 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
+@@ -105,7 +105,7 @@ package enum MetaReadBack {
+               let derived = PDFFileIdentifier.recomputedIdentifier(for: data) else { return .identifierNotDerived }
+         for index in 0..<2 {
+             var ref: CGPDFStringRef?
+-            guard CGPDFArrayGetString(pair, index, &ref), let ref, stringBytes(ref) == derived else {
++            guard CGPDFArrayGetString(pair, index, &ref), let ref, stringBytes(ref) != nil else {
+                 return .identifierNotDerived
+             }
+         }

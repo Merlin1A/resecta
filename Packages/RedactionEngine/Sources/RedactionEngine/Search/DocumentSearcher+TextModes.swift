@@ -29,14 +29,14 @@ extension DocumentSearcher {
             progress(pageIndex + 1, pageCount)
 
             guard let page = doc.page(at: pageIndex) else {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
+                Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
                 continue
             }
             let pageText = page.string ?? ""
 
             if !pageText.isEmpty && pageHasRichTextLayer(pageIndex) {
                 // Text-layer path
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
+                Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
                 let results = await withInkFitRead(page) { findTextMatches(
                     pageText: pageText, query: query, options: options,
                     page: page, pageIndex: pageIndex, term: query
@@ -103,7 +103,7 @@ extension DocumentSearcher {
             progress(pageIndex + 1, pageCount)
 
             guard let page = doc.page(at: pageIndex) else {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
+                Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
                 continue
             }
             let pageText = page.string ?? ""
@@ -128,7 +128,7 @@ extension DocumentSearcher {
                 continue
             }
 
-            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
+            Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
 
             // PDFPage isn't Sendable; the per-match closure below captures the
             // page (the enumeration invokes it synchronously), via the wrapper.
@@ -240,14 +240,14 @@ extension DocumentSearcher {
                 progress(pageIndex + 1, pageCount)
 
                 guard let page = doc.page(at: pageIndex) else {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
+                Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
                 continue
             }
                 let pageText = page.string ?? ""
                 // Text-layer fast path only for `.rich`/unknown
                 // pages; `.sparse`/`.none` fall through to OCR per term.
                 let useTextLayer = !pageText.isEmpty && pageHasRichTextLayer(pageIndex)
-                if useTextLayer { pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer)) }
+                if useTextLayer { Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer)) }
 
                 var pageHits: [SearchResult] = []
                 for term in terms {
@@ -296,14 +296,14 @@ extension DocumentSearcher {
             progress(pageIndex + 1, pageCount)
 
             guard let page = doc.page(at: pageIndex) else {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
+                Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
                 continue
             }
             let pageText = page.string ?? ""
             // Text-layer fast path only for `.rich`/unknown
             // pages; `.sparse`/`.none` fall through to OCR per term.
             let useTextLayer = !pageText.isEmpty && pageHasRichTextLayer(pageIndex)
-            if useTextLayer { pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer)) }
+            if useTextLayer { Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer)) }
 
             for term in terms {
                 if Task.isCancelled || totalYielded >= Self.maxResults { break }

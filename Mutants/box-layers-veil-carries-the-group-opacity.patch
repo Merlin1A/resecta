@@ -1,0 +1,18 @@
+Property: A veil in the veils' group has no opacity of its own: the group carries it, so overlapping veils are not darker where they overlap.
+Area: canvas overlay (the box layers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxLayerSpecTests
+Must go red: ResectaAppTests/BoxLayerSpecTests layers()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/BoxLayers.swift b/Sources/ResectaApp/Overlay/BoxLayers.swift
+--- a/Sources/ResectaApp/Overlay/BoxLayers.swift
++++ b/Sources/ResectaApp/Overlay/BoxLayers.swift
+@@ -140,7 +140,7 @@
+                 switch step.layer {
+                 case .veil where group == .veils:
+                     specs.append(LayerSpec(key: key, group: group, kind: .fill, frame: veilFrame(suffix(key)) ?? rect,
+-                                           fill: opaque(step.tone)))
++                                           fill: opaque(step.tone), opacity: step.tone.alpha))
+                 case .veil:
+                     // The box being moved: its veil carries its own opacity
+                     // and the lift's shadow.

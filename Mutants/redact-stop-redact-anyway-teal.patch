@@ -1,0 +1,19 @@
+Property: Exactly one capsule is teal, and it is never Redact Anyway.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BeforeYouRedactSheetTests
+Must go red: ResectaAppTests/BeforeYouRedactSheetTests oneTealCapsule
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
+index ee77fb726..f0f50aefb 100644
+--- a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
++++ b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
+@@ -53,7 +53,7 @@ struct BeforeYouRedactSheet: View {
+                     Choice(capsule: .redactAnyway, style: .outlined),
+                     Choice(capsule: .cancel, style: .plain)]
+         }
+-        return [Choice(capsule: .redactAnyway, style: .outlined),
++        return [Choice(capsule: .redactAnyway, style: .tealSolid),
+                 Choice(capsule: .cancel, style: .tealSolid)]
+     }
+ 

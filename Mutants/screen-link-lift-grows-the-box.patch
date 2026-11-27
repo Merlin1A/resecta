@@ -1,0 +1,21 @@
+Property: A box being moved is drawn on its own rectangles, the size it has at rest.
+Area: canvas overlay (the screen link)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ScreenLinkTests
+Must go red: ResectaAppTests/ScreenLinkTests liftAtRest()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
+@@ -150,7 +150,10 @@
+         handleScale: CGFloat = 1
+     ) -> [InkStep] {
+         let resting = boxes.filter { !moving.contains($0.id) }
+-        let lifted = boxes.filter { moving.contains($0.id) }
++        let lifted = boxes.filter { moving.contains($0.id) }.map {
++            InkBox(id: $0.id, tight: $0.tight.insetBy(dx: -3, dy: -3), fill: $0.fill.map { $0.insetBy(dx: -3, dy: -3) },
++                   isSelected: $0.isSelected, tag: $0.tag)
++        }
+         let steps = look(for: resting, settings: settings, fingerScale: fingerScale)
+             + tagSteps(for: resting, page: page, fingerScale: fingerScale)
+             + marks(for: resting, selectionCount: selectionCount, handlesActive: handlesActive,

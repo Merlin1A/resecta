@@ -1,0 +1,19 @@
+Property: A report of a page too large for recognition is the too-large fact.
+Area: the account of what a search read
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/AccountReportToFactTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'AccountReportToFactTests')
+Must go red: RedactionEngineTests/AccountReportToFactTests eachRoute; RedactionEngineTests/AccountReportToFactTests tooLargeFolds
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+index 95699f18..1248ac11 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+@@ -71,7 +71,7 @@ struct AccountOfWhatWasRead: Sendable, Hashable {
+                 case .ink: facts.insert(.emptyReadWithInk)
+                 case .blank: facts.insert(.emptyReadBlank)
+                 }
+-            case .ocrSkippedOversize: facts.insert(.tooLarge)
++            case .ocrSkippedOversize: facts.insert(.recognised)
+             case .ocrUnavailable: facts.insert(.recognitionFailed)
+             case .unopenable: facts.insert(.unopenable)
+             }

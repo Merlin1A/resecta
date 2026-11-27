@@ -1,0 +1,20 @@
+Property: The app keeps an export only when its read-back held: the gate before the rename reads it.
+Area: the read-back of the finished file (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/MetaReadBackGateTests
+Must go red: ResectaAppTests/MetaReadBackGateTests coordinatorGateReadsTheReadBack; ResectaAppTests/MetaReadBackGateTests readBackRefusalPromotesNoOutput
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift b/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift
+index 1b701f46..b95f7634 100644
+--- a/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift
++++ b/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift
+@@ -104,8 +104,7 @@ extension PipelineCoordinator {
+         // missing, an identifier not derived from the file, or a value the
+         // writer stamped still in its bytes (`MetaReadBack`).
+         guard await reconstructor.writtenPageCount == pages.count,
+-              await reconstructor.infoPatchesWhole,
+-              await reconstructor.metaReadBackHeld else {
++              await reconstructor.infoPatchesWhole else {
+             throw PipelineError.redactionError(.reconstructionFailed)
+         }
+ 

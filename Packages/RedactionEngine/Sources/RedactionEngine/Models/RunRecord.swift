@@ -232,6 +232,9 @@ public struct RunRecord: Equatable, Sendable {
         /// Which way found the information dictionary for its rewrite; nil
         /// until the rewrite has run.
         package var infoDictionary: InfoDictionaryWay?
+        /// What the read-back of the finished file saw; nil until `finalize`
+        /// has run it. Never a value from the file.
+        package var metaReadBack: MetaReadBack.Outcome?
 
         /// Nothing produced yet.
         public init() {
@@ -246,6 +249,7 @@ public struct RunRecord: Equatable, Sendable {
             self.pageImageDigests = pageImageDigests
             self.paintedRectangles = paintedRectangles
             self.infoDictionary = infoDictionary
+            self.metaReadBack = nil
         }
     }
 }
@@ -264,12 +268,14 @@ extension RunRecord.Produced {
     }
 
     /// Records what the writer reports for the file: the SHA-256 of each
-    /// page's picture as it was handed to the draw, and which way found the
-    /// information dictionary for its rewrite. The one writer of those fields
-    /// in a run; what the rasterizer recorded is kept.
+    /// page's picture as it was handed to the draw, which way found the
+    /// information dictionary for its rewrite, and what the read-back of the
+    /// finished file saw. The one writer of those fields in a run; what the
+    /// rasterizer recorded is kept.
     public mutating func record(writer account: RunRecord.Produced) {
         pageImageDigests = account.pageImageDigests
         infoDictionary = account.infoDictionary
+        metaReadBack = account.metaReadBack
     }
 }
 

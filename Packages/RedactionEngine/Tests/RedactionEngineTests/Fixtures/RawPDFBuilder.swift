@@ -1549,7 +1549,7 @@ enum TestFixtures {
 extension TestFixtures {
 
     /// Single text page whose page dictionary carries a non-default /UserUnit.
-    /// The H-16 guard (`validatePage`, ENGINE §2.6) must refuse to rasterize it;
+    /// The /UserUnit guard (`validatePage`) must refuse to rasterize it;
     /// import validation has no /UserUnit check, so the document OPENS and the
     /// rejection surfaces at redact time (IM-17 / C12-16).
     static func userUnitPDF(

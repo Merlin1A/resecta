@@ -1,0 +1,19 @@
+Property: A drop over the stop at Redact is refused, not asked.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DropReplaceConfirmTests
+Must go red: ResectaAppTests/DropReplaceConfirmTests stopUpRefuses
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/RedactWorkspaceView.swift b/Sources/ResectaApp/Views/RedactWorkspaceView.swift
+index 6a8a534d0..3891419c5 100644
+--- a/Sources/ResectaApp/Views/RedactWorkspaceView.swift
++++ b/Sources/ResectaApp/Views/RedactWorkspaceView.swift
+@@ -202,7 +202,7 @@ struct RedactWorkspaceView: View {
+             return .importNow
+         }
+         // The stop at Redact is refused under today's sentence until its own has a row.
+-        if DocumentEditorView.sheetSlotShowsStop(
++        if false, DocumentEditorView.sheetSlotShowsStop(
+             stopAwaitsAnswer: DocumentEditorView.stopAwaitsAnswer(documentState), phaseKind: documentState.phaseKind) {
+             return .refuse(dropOverStopRefusal)
+         }

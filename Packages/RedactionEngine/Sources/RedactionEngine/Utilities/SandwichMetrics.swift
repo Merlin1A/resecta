@@ -56,7 +56,7 @@ enum SandwichMetrics {
 
     // MARK: - Pitch quantization
 
-    /// Pitch quantization step (J-12): band sizes round to
+    /// Pitch quantization step of the line layout: band sizes round to
     /// the nearest half point. Coarser steps leak fewer content-derived
     /// bits per band and bound the doc-wide distinct-size set (measured:
     /// 17 sizes across the 23-page real-document fixture at 0.5pt).

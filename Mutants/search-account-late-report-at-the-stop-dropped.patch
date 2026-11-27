@@ -1,0 +1,19 @@
+Property: After a Stop or at the result limit, a late report for the stop page itself still counts, as one sent before the stop.
+Area: the account of a search run
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchAccountLifecycleTests
+Must go red: ResectaAppTests/SearchAccountLifecycleTests lateReportsAfterStop; ResectaAppTests/SearchAccountLifecycleTests lateReportsAtLimit
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/SearchState+Account.swift b/Sources/ResectaApp/State/SearchState+Account.swift
+index bff104a6..c6727464 100644
+--- a/Sources/ResectaApp/State/SearchState+Account.swift
++++ b/Sources/ResectaApp/State/SearchState+Account.swift
+@@ -73,7 +73,7 @@ extension SearchState {
+     static func lateReportCounts(page: Int, after ending: SearchAccount.Ending) -> Bool {
+         switch ending {
+         case .completed: true
+-        case .stopped(let stop), .stoppedAtResultLimit(let stop): page <= stop
++        case .stopped(let stop), .stoppedAtResultLimit(let stop): page < stop
+         }
+     }
+ 

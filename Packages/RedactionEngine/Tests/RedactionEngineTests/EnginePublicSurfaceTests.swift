@@ -40,10 +40,27 @@ struct EnginePublicSurfaceTests {
             TextSpan.self,
             PageSearchCoverage.self,
             RunRecord.self,
+            SearchAccount.self,
         ]
-        #expect(types.count == 22)
+        #expect(types.count == 23)
         #expect(DocumentSearcher.maxResults > 0)
         #expect(DocumentSearcher.validateRegexPattern("[a-z]+") != nil)
+    }
+
+    /// Never called: the search account's face, public member by member.
+    private func accountMembers(coverage: PageSearchCoverage, query: AppliedSearchQuery) {
+        var account = SearchAccount(pageCount: 2)
+        account.record(coverage)
+        account.recordRecognitionOff(page: 0)
+        account.recordPatternTimedOut(page: 1, text: "")
+        account.recordUnboxedMatch(page: 1, text: "")
+        account.end(.stopped(page: 1))
+        _ = (account.pageCount, account.ending, account.stopPage, account.qualifiedPages, account.quietPages)
+        _ = (account.plainNoMatchAllowed, account.pagesThatStopRedact, SearchAccount.LineReason.order)
+        _ = (account.pages(for: .picturesNotRead(.notReported)), account.patternTimedOutTexts, account.unboxedMatchTexts)
+        _ = (account.forText(""), SearchAccount.joined([account]))
+        let record = AppliedSearchRecord(query: query, foundCount: 0, accountToken: UUID(), account: account)
+        _ = (record.accountToken, record.account, SearchAccount.PictureCause.allCases)
     }
 
     /// Never called: it type-checks only while every member it names is public.

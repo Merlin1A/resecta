@@ -314,19 +314,16 @@ struct SearchAndRedactSheet: View {
             // Both toast hosts clear the sheet from its first frame, not
             // only after a detent change (a sticky compact reopen).
             toastManager.bottomClearance = toastBottomClearance(sheetPresented: true)
-            // One-tap contract: the toolbar Scan button armed a
-            // one-shot flag before presenting. Consume it exactly once
+            // One-tap contract: the Scan button or the stop's Search These
+            // Pages armed a one-shot before presenting. Consume it exactly once
             // here — this is the sole trigger for the auto-run.
             // Overlapping `triggerSearch()` callers additionally
             // coalesce through the single-flight gate
             // (`beginTriggerSetup`), so a second same-turn trigger site
             // re-runs once instead of racing; the single consume stays
             // the first line of defense.
-            if searchState.pendingAutoRunScan {
-                searchState.pendingAutoRunScan = false
-                if searchState.searchModeType == .piiScan {
-                    triggerSearch()
-                }
+            if searchState.consumeAutoRun() {
+                triggerSearch()
             }
             #if DEBUG
             // Sim-verification hook (read-only MCP — no taps): present

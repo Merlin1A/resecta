@@ -1,0 +1,18 @@
+Property: The coordinator's gate reads the whole-patch flag: with the read-back made to accept, a literal left part-written still promotes no output.
+Area: the export's promotion gate (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/MetaReadBackGateTests
+Must go red: ResectaAppTests/MetaReadBackGateTests wholePatchFlagStopsAlone; ResectaAppTests/MetaReadBackGateTests coordinatorGateReadsTheReadBack
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift b/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift
+index 1b701f46..5228b638 100644
+--- a/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift
++++ b/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift
+@@ -104,7 +104,6 @@ extension PipelineCoordinator {
+         // missing, an identifier not derived from the file, or a value the
+         // writer stamped still in its bytes (`MetaReadBack`).
+         guard await reconstructor.writtenPageCount == pages.count,
+-              await reconstructor.infoPatchesWhole,
+               await reconstructor.metaReadBackHeld else {
+             throw PipelineError.redactionError(.reconstructionFailed)
+         }

@@ -1,0 +1,19 @@
+Property: The plain no-match is chosen only when every page was read from its own text or is blank.
+Area: the Search sheet's statement
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchStatementTableTests -only-testing:ResectaAppTests/SearchStatementRuleTests
+Must go red: ResectaAppTests/SearchStatementTableTests table; ResectaAppTests/SearchStatementRuleTests k201; ResectaAppTests/SearchStatementRuleTests k202; ResectaAppTests/SearchStatementRuleTests k207
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchStatement.swift b/Sources/ResectaApp/Views/Search/SearchStatement.swift
+index 0e6f904a..5aa46c73 100644
+--- a/Sources/ResectaApp/Views/Search/SearchStatement.swift
++++ b/Sources/ResectaApp/Views/Search/SearchStatement.swift
+@@ -74,7 +74,7 @@ enum SearchStatement {
+         guard account.ending == .completed else {
+             return recognised > 0 ? .stoppedWithRecognition(recognised) : .stopped
+         }
+-        if account.plainNoMatchAllowed { return .plain }
++        if account.plainNoMatchAllowed || account.pageCount > 0 { return .plain }
+         return recognised > 0 ? .qualified(recognised) : .lead
+     }
+ }

@@ -1,0 +1,18 @@
+Property: No log line names the run log, the answered set or their types.
+Area: the Redact stop
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunLogStaysInMemoryTests
+Must go red: ResectaAppTests/RunLogStaysInMemoryTests noLogLineNamesThem()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactionState.swift b/Sources/ResectaApp/State/RedactionState.swift
+--- a/Sources/ResectaApp/State/RedactionState.swift
++++ b/Sources/ResectaApp/State/RedactionState.swift
+@@ -506,7 +506,7 @@ class RedactionState {
+             } catch { // LegalPhrases:safe (Swift keyword)
+                 let failure = error as NSError
+                 logger.error(
+-                    "Output unlink failed: \(failure.domain, privacy: .public) \(failure.code, privacy: .public)")
++                    "Output unlink failed: \(failure.domain, privacy: .public) \(failure.code, privacy: .public) \(self.searchRunLog.count, privacy: .public)")
+             }
+         }
+         clearVerification()

@@ -193,9 +193,9 @@ struct DocumentEditorExportFlow {
     // one source of truth.
     func canExport(report: VerificationReport) -> Bool {
         // FAIL override / "Option B": a standing FAIL no longer disables
-        // the Share card — it stays enabled (red-tinted via
-        // VerificationResultsView.shouldTintShareRed(report:)) and routes through the
-        // one-time "Share Anyway" confirm in handleExportTap. Enablement now
+        // the Share card — it stays enabled (outlined under the filled Keep
+        // Editing, VerificationResultsActions.swapsPrimaryAction) and routes
+        // through the one-time "Share Anyway" confirm in handleExportTap. Enablement now
         // depends only on a fresh, valid output existing on disk. (`report` is
         // retained in the signature so the call site and gate seam stay stable.)
         guard let url = redactionState.outputURL,
