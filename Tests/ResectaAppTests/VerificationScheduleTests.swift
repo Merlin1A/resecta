@@ -15,7 +15,7 @@ import PDFKit
 @MainActor
 struct VerificationScheduleTests {
 
-    @Test("The phases are the mode's layers grouped by phase; the re-check is last",
+    @Test("The phases are the mode's layers grouped by phase; Box Fill is numbered last and runs with the catalog readers",
           arguments: [PipelineMode.secureRasterization, PipelineMode.searchableRedaction])
     func phaseGrouping(mode: PipelineMode) {
         let layers = VerificationEngine().layers(for: mode)
@@ -24,16 +24,16 @@ struct VerificationScheduleTests {
         let sandwich = layers.filter { $0.phase == .sandwichSequential }
         let post = layers.filter { $0.phase == .postSequential }
         #expect(parallel.count + catalog.count + sandwich.count + post.count == layers.count)
-        #expect(catalog == [.structureCheck, .metadataCheck])
+        #expect(catalog == [.structureCheck, .metadataCheck, .boxFill])
         #expect(post == [.searchRecheck, .detectionSweep])
-        #expect(layers.last == .detectionSweep)
+        #expect(layers.last == .boxFill)
         switch mode {
         case .secureRasterization:
-            #expect(layers.count == 7)
+            #expect(layers.count == 8)
             #expect(parallel == [.textExtraction, .ocrCheck, .binaryStringSearch])
             #expect(sandwich.isEmpty)
         case .searchableRedaction:
-            #expect(layers.count == 13)
+            #expect(layers.count == 14)
             #expect(parallel == [.textExtraction, .ocrCheck, .binaryStringSearch, .operatorReExtraction])
             #expect(sandwich == [.spatialVerification, .characterCount, .fontVerification, .characterLineage, .hiddenWordInk])
         }
@@ -66,14 +66,18 @@ struct VerificationScheduleTests {
 
     private enum ScheduleTestError: Error { case notVerified }
 
-    @Test("Raster verify-only reports seven layers in canonical order, the re-check then the sweep last — the re-check idle, the sweep run on the output")
+    @Test("Raster verify-only reports eight layers in canonical order, the re-check, the sweep, then Box Fill last — the re-check idle, the sweep run on the output, Box Fill skipped with no record")
     func rasterReportIsCanonical() async throws {
         let report = try await verifyOnlyReport(mode: .secureRasterization)
         let expected = VerificationEngine().layers(for: .secureRasterization)
-        #expect(report.layers.count == 7)
+        #expect(report.layers.count == 8)
         #expect(report.layers.map(\.name) == expected.map(\.name))
         #expect(report.layers.map(\.layer) == expected.map { Optional($0) })
-        let last = try #require(report.layers.last)
+        // This fixture made no run, so there is no record and Box Fill reads Skipped.
+        let boxFill = try #require(report.layers.last)
+        #expect(boxFill.layer == .boxFill)
+        #expect(boxFill.status == .skipped)
+        let last = report.layers[6]
         #expect(last.layer == .detectionSweep)
         #expect(last.name == "Detection Sweep")
         // Every run carries the sweep request — the verify-only fallback
@@ -85,16 +89,17 @@ struct VerificationScheduleTests {
         #expect(recheck.layer == .searchRecheck)
         #expect(recheck.status == .notApplicable(""))
         #expect(recheck.shortDescription == SearchRecheck.infoMessage)
-        #expect(!report.layers.contains { $0.status.isSkipped },
+        #expect(!report.layers.dropLast().contains { $0.status.isSkipped },
                 "an idle re-check has nothing to check, never a skipped layer")
     }
 
-    @Test("Searchable verify-only reports thirteen layers in canonical order; the parallel-batch layer keeps its ordinal")
+    @Test("Searchable verify-only reports fourteen layers in canonical order; the parallel-batch layer keeps its ordinal")
     func searchableReportIsCanonical() async throws {
         let report = try await verifyOnlyReport(mode: .searchableRedaction)
         let expected = VerificationEngine().layers(for: .searchableRedaction)
-        #expect(report.layers.count == 13)
+        #expect(report.layers.count == 14)
         #expect(report.layers.map(\.name) == expected.map(\.name))
+        #expect(report.layers[13].layer == .boxFill)
         // Operator Re-Extraction completes in the parallel base batch but
         // the report places it at its canonical ordinal (index 9).
         #expect(report.layers[9].layer == .operatorReExtraction)

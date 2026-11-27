@@ -1,0 +1,18 @@
+Property: The run's record takes the writer's page picture digests.
+Area: the Box Fill row (the run's record)
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter BoxFillOwnRecordTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxFillOwnRecordTests digestIsOfTheStoredPicture, ownRecordPasses
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+index 19dfb7c1..0dd71421 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+@@ -176,7 +176,6 @@ extension RunRecord.Produced {
+     /// information dictionary for its rewrite. The one writer of those fields
+     /// in a run; what the rasterizer recorded is kept.
+     public mutating func record(writer account: RunRecord.Produced) {
+-        pageImageDigests = account.pageImageDigests
+         infoDictionary = account.infoDictionary
+     }
+ }

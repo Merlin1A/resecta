@@ -222,7 +222,13 @@ extension VerificationResultsView {
         if report.layers.contains(where: { $0.status.isAttention && $0.layer == .detectionSweep }) {
             return ("\(keepEditing), then open Scan to review the pages below.", false)
         }
-        return ("\(lead) the terms below.", false)
+        // Any other needs-review row names no term to search for (a box
+        // that is not exactly the fill is one): the sentence asks that the
+        // rows be read, by the number of such rows.
+        let findings = report.layers.filter(\.status.isAttention).count
+        return (findings == 1
+            ? "Read the finding below before you share the PDF." // LegalPhrases:safe (approved words)
+            : "Read the findings below before you share the PDF.", false) // LegalPhrases:safe (approved words)
     }
 
     /// The ATTENTION sentence when every review term's remaining matches

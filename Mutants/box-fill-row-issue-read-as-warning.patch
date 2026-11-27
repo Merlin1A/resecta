@@ -1,0 +1,19 @@
+Property: A box that is not exactly the fill reads Needs Review, never an ordinary warning, which shares with no question.
+Area: the Box Fill row
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter BoxFillRowTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxFillRowTests each [a box on page 4 not the fill: Needs Review, the new-check line under it], each [an issue on page 4 and page 9 unread: Needs Review with the could-not-verify part beside it], throughTheEngine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
+index 35889a69..32677806 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
+@@ -61,7 +61,7 @@ enum BoxFillRow {
+         if !found.isEmpty {
+             let sentence = findSentence(found)
+             let row = CheckRowComposition.compose(
+-                issue: (.attention(sentence), Array(Set(found)).sorted()), conditions: conditions, warnings: [])
++                issue: (.warn(sentence), Array(Set(found)).sorted()), conditions: conditions, warnings: [])
+             return .row(row ?? CheckRow(status: .attention(sentence), pages: Array(Set(found)).sorted(), couldNotVerify: false),
+                         LayerCopy(short: sentence, detail: newCheckLine))
+         }

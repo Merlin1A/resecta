@@ -257,15 +257,15 @@ struct VerificationResultsActionsTests {
     @Test("The ring: P of T with T the checks that had something to check, the verdict's tone; SKIPPED draws the slot")
     func ringContent() {
         #expect(VerificationMasthead.ringContent(report: Fixtures.searchableAllRasterized)
-                == .count(passed: 10, total: 10, tone: .pass))
+                == .count(passed: 11, total: 11, tone: .pass))
         #expect(VerificationMasthead.ringContent(report: Fixtures.searchableAttentionMixed)
-                == .count(passed: 8, total: 12, tone: .attention))
+                == .count(passed: 9, total: 13, tone: .attention))
         #expect(VerificationMasthead.ringContent(report: Fixtures.secureWarningOnly)
-                == .count(passed: 6, total: 7, tone: .warn))
+                == .count(passed: 7, total: 8, tone: .warn))
         #expect(VerificationMasthead.ringContent(report: Fixtures.pageCountGate)
                 == .count(passed: 0, total: 1, tone: .fail))
         #expect(VerificationMasthead.ringContent(report: Fixtures.secureAllFailed)
-                == .count(passed: 0, total: 7, tone: .fail))
+                == .count(passed: 0, total: 8, tone: .fail))
         #expect(VerificationMasthead.ringContent(report: Fixtures.secureSkippedOff) == .skipped)
         #expect(VerificationMasthead.ringContent(report: Self.report(.info("i"))) == .count(passed: 0, total: 0, tone: .pass))
     }
@@ -351,7 +351,7 @@ struct VerificationResultsActionsTests {
         // A run where every check passed: one row holding every check, closed.
         let clean = partition(Fixtures.secureAllPass)
         #expect(VerificationDetailsSection.listRowMembers(clean) == Array(Fixtures.secureAllPass.layers.indices))
-        #expect(clean.clusterTitle == "7 checks passed")
+        #expect(clean.clusterTitle == "8 checks passed")
         #expect(!VerificationDetailsSection.clusterOpensByDefault(clean))
         // A riding note with nothing above still opens on arrival.
         #expect(VerificationDetailsSection.clusterOpensByDefault(partition(Fixtures.securePassRidingNote)))
@@ -418,7 +418,7 @@ struct VerificationResultsActionsTests {
         #expect(chips.lead == ["It matches text you redacted. Use text\u{00A0}search to redact the rest."])
         let paged = VerificationRowModel(layer: mixed, perPageModes: [], pagesOnChips: false)
         #expect(paged.caption == "\u{201C}Delia\u{201D} is still readable on\u{00A0}page\u{00A0}2.")
-        let sweep = Fixtures.secureScreenshot.layers.last!
+        let sweep = Fixtures.secureScreenshot.layers.first { $0.layer == .detectionSweep }!
         #expect(VerificationRowModel(layer: sweep, perPageModes: [], pagesOnChips: true).caption
                 == "5 possible items remain.")
         let recheck = Fixtures.searchableRecheckReview.layers[11]

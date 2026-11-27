@@ -257,13 +257,23 @@ struct HiddenWordInkRunCases {
         let strip = try #require(Self.hiddenRect(page, "Okafor"), "the boxed word has a hidden box")
         let region = RedactionRegion(id: UUID(), normalizedRect: Self.inkRect(Self.approvalLines, line: 23, phrase: "Okafor"),
                                      source: .searchMatch(term: "okafor"), textLayerRect: strip, textAnchored: true)
+        // The run's record, as the app's run makes it: the page as confirmed, with its plan made from
+        // its geometry and its read, and what the page's raster and the writer recorded. Verification
+        // reads the export against it, as it reads every export the app makes.
+        let geometry = RunRecord.PageGeometry(cropBox: page.bounds(for: .cropBox), rotation: page.rotation)
+        let reads = await RunRecord.PageRead.reads(of: SendablePDFDocument(source), pages: [0], hasHiddenOCG: false)
+        let confirmed = RunRecord.Confirmed(fillColor: .black, exportDPI: 300, pages: [
+            RunRecord.Page(pageIndex: 0, regions: [RunRecord.DrawnRegion(region: region)], geometry: geometry,
+                           geometryAtStore: geometry, switchOn: false, read: reads[0])])
         let pageData = PDFPageData(page: page, pageIndex: 0, regions: [region], fillColor: .black, targetDPI: 300,
                                    pipelineMode: .searchableRedaction, rotation: page.rotation,
                                    cropBoxBounds: page.bounds(for: .cropBox), cgPage: cgPage,
-                                   hasText: page.string?.isEmpty == false)
+                                   hasText: page.string?.isEmpty == false, confirmedPage: confirmed.pages[0])
         let raster = try await PageTextPath.$wholeWordsOff.withValue(wholeWordsOff) {
             try await PageRasterizer().rasterize(pageData)
         }
+        var produced = RunRecord.Produced()
+        produced.record(raster, pageIndex: 0)
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("hidden-word-pair-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let tempURL = dir.appendingPathComponent("recon.pdf"), outputURL = dir.appendingPathComponent("output.pdf")
@@ -271,6 +281,7 @@ struct HiddenWordInkRunCases {
         try await reconstructor.begin(firstPageSize: page.bounds(for: .cropBox).size)
         try await reconstructor.appendPage(raster.pageOutput)
         await reconstructor.finalize()
+        produced.record(writer: await reconstructor.produced)
         try FileManager.default.moveItem(at: tempURL, to: outputURL)
         let output = try #require(PDFDocument(url: outputURL))
         let text = output.page(at: 0)?.string ?? ""
@@ -280,6 +291,7 @@ struct HiddenWordInkRunCases {
             pipelineMode: .searchableRedaction, filterDigests: [raster.filterDigest],
             perPageModes: [.searchableRedaction], perPageFallbackReasons: [raster.fallbackReason],
             appliedSearches: [], sourceDocument: SendablePDFDocument(source),
+            record: RunRecord(confirmed: confirmed, produced: produced),
             provisionLayerDocuments: { _ in nil }, events: { _ in })
         return (text, report)
     }

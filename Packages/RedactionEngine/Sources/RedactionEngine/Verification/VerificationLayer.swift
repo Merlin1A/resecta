@@ -10,9 +10,11 @@ import Foundation
 /// consumer does index arithmetic.
 ///
 /// The Searchable order is the declaration order. Secure Rasterization runs
-/// the five base checks and the two post-sequential checks (seven);
-/// Searchable Redaction runs all thirteen. The two post-sequential checks —
-/// the search re-check, then the detection sweep — are last in both modes.
+/// the five base checks, the two post-sequential checks and Box Fill
+/// (eight); Searchable Redaction runs all fourteen. The two post-sequential
+/// checks — the search re-check, then the detection sweep — run last in both
+/// modes; Box Fill is declared last, so it is numbered last, and runs with
+/// the catalog readers.
 public enum VerificationLayer: String, CaseIterable, Sendable, Hashable {
     case textExtraction
     case ocrCheck
@@ -27,12 +29,14 @@ public enum VerificationLayer: String, CaseIterable, Sendable, Hashable {
     case hiddenWordInk
     case searchRecheck
     case detectionSweep
+    case boxFill
 
     /// When a layer runs inside a verification pass. The coordinator groups
     /// `layers(for:)` by phase: the parallel base batch first (independent
-    /// reads, one document instance each), then the two catalog readers in
-    /// sequence, then the sandwich checks in sequence (inter-layer
-    /// baselines), then the post-sequential checks last.
+    /// reads, one document instance each), then the catalog readers in
+    /// sequence (the structure and metadata checks, then Box Fill), then the
+    /// sandwich checks in sequence (inter-layer baselines), then the
+    /// post-sequential checks last.
     public enum ExecutionPhase: Sendable, Hashable, CaseIterable {
         case parallelBase
         case catalogSequential
@@ -56,6 +60,7 @@ public enum VerificationLayer: String, CaseIterable, Sendable, Hashable {
         case .hiddenWordInk: "Hidden Words Under Boxes"
         case .searchRecheck: "Search Re-check"
         case .detectionSweep: "Detection Sweep"
+        case .boxFill: "Box Fill"
         }
     }
 
@@ -76,6 +81,7 @@ public enum VerificationLayer: String, CaseIterable, Sendable, Hashable {
         case .hiddenWordInk: "eye.slash"
         case .searchRecheck: "text.page.badge.magnifyingglass"
         case .detectionSweep: "rectangle.and.text.magnifyingglass"
+        case .boxFill: "rectangle.inset.filled"
         }
     }
 
@@ -84,7 +90,7 @@ public enum VerificationLayer: String, CaseIterable, Sendable, Hashable {
         switch self {
         case .textExtraction, .ocrCheck, .binaryStringSearch, .operatorReExtraction:
             .parallelBase
-        case .structureCheck, .metadataCheck:
+        case .structureCheck, .metadataCheck, .boxFill:
             .catalogSequential
         case .spatialVerification, .characterCount, .fontVerification, .characterLineage, .hiddenWordInk:
             .sandwichSequential
@@ -101,7 +107,8 @@ public enum VerificationLayer: String, CaseIterable, Sendable, Hashable {
         case .secureRasterization:
             switch self {
             case .textExtraction, .ocrCheck, .binaryStringSearch,
-                 .structureCheck, .metadataCheck, .searchRecheck, .detectionSweep:
+                 .structureCheck, .metadataCheck, .searchRecheck, .detectionSweep,
+                 .boxFill:
                 return true
             case .spatialVerification, .characterCount, .fontVerification,
                  .characterLineage, .operatorReExtraction, .hiddenWordInk:

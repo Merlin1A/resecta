@@ -132,7 +132,7 @@ struct HiddenWordInkLayerCases {
         #expect(!run.report.overallStatus.isFail)
     }
 
-    @Test("V7: the check does not apply in Secure: the report keeps its seven rows", .timeLimit(.minutes(3)))
+    @Test("V7: the check does not apply in Secure: the report keeps its eight rows", .timeLimit(.minutes(3)))
     func v7() async throws {
         let layer = try Self.layer()
         #expect(!layer.appliesTo(.secureRasterization))
@@ -140,7 +140,7 @@ struct HiddenWordInkLayerCases {
         let run = try await F.mirrorRun(Self.seeded, paint: F.inkRect(line: 5, phrase: "Marisol", through: "Vance-Oduya"),
                                         mode: .secureRasterization)
         #expect(!run.report.layers.contains { $0.layer == layer })
-        #expect(run.report.layers.count == 7)
+        #expect(run.report.layers.count == 8)
     }
 
     // MARK: - Nothing to check: no source read

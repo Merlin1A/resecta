@@ -38,24 +38,12 @@ nonisolated struct CanvasPixelProbe {
     private let data: [UInt8]
 
     init?(_ shot: XCUIScreenshot, windowSize: CGSize) {
-        guard let cg = shot.image.cgImage, windowSize.width > 0 else { return nil }
-        let w = cg.width, h = cg.height
-        var buf = [UInt8](repeating: 0, count: w * h * 4)
-        let drawn: Bool = buf.withUnsafeMutableBytes { ptr -> Bool in
-            guard let ctx = CGContext(
-                data: ptr.baseAddress, width: w, height: h, bitsPerComponent: 8,
-                bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-            ) else { return false }
-            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
-            return true
-        }
-        guard drawn else { return nil }
+        guard let cg = shot.image.cgImage, windowSize.width > 0, let pixels = DevicePixels(cg) else { return nil }
         self.windowSize = windowSize
-        width = w
-        height = h
-        scale = CGFloat(w) / windowSize.width
-        data = buf
+        width = pixels.width
+        height = pixels.height
+        scale = CGFloat(pixels.width) / windowSize.width
+        data = pixels.data
     }
 
     func rgb(_ x: CGFloat, _ y: CGFloat) -> (Int, Int, Int) {
@@ -224,5 +212,130 @@ nonisolated struct CanvasPixelProbe {
         }
         let a = luminance(rgb(p.x, p.y)), b = luminance(rgb(q.x, q.y))
         return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+    }
+}
+
+// MARK: - Device pixels: the edge scan and the classed reading
+
+nonisolated extension CanvasPixelProbe {
+    /// A bitmap drawn into device RGB, 8 bits a channel, row 0 at its top: the
+    /// file's one reader of device pixels, the probe's own and the scans'.
+    struct DevicePixels {
+        let width: Int
+        let height: Int
+        let data: [UInt8]
+
+        init?(_ image: CGImage) {
+            let w = image.width, h = image.height
+            guard w > 0, h > 0 else { return nil }
+            var buf = [UInt8](repeating: 0, count: w * h * 4)
+            let drawn: Bool = buf.withUnsafeMutableBytes { ptr -> Bool in
+                guard let ctx = CGContext(
+                    data: ptr.baseAddress, width: w, height: h, bitsPerComponent: 8,
+                    bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                ) else { return false }
+                ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+                return true
+            }
+            guard drawn else { return nil }
+            width = w
+            height = h
+            data = buf
+        }
+
+        func rgb(_ x: Int, _ y: Int) -> (r: Int, g: Int, b: Int) {
+            let i = (y * width + x) * 4
+            return (Int(data[i]), Int(data[i + 1]), Int(data[i + 2]))
+        }
+
+        /// The marks along row `y` (empty when it is outside the bitmap).
+        func row(_ y: Int, _ mark: ((r: Int, g: Int, b: Int)) -> Mark) -> [Mark] {
+            (0..<height).contains(y) ? (0..<width).map { mark(rgb($0, y)) } : []
+        }
+
+        /// The marks down column `x` (empty when it is outside the bitmap).
+        func column(_ x: Int, _ mark: ((r: Int, g: Int, b: Int)) -> Mark) -> [Mark] {
+            (0..<width).contains(x) ? (0..<height).map { mark(rgb(x, $0)) } : []
+        }
+    }
+
+    /// The outermost steps between paper and not-paper along one row and one column of a bitmap.
+    /// All four are device-pixel indices in the bitmap, origin at its top-left.
+    struct Edges: Equatable { let left: Int; let right: Int; let top: Int; let bottom: Int }
+
+    /// `row` and `column` are device-pixel indices through the box's middle. A pixel is "not paper"
+    /// when any channel differs from `paper` by more than `step`. Returns nil when the row or the
+    /// column holds no such pixel.
+    static func edges(in bitmap: CGImage, row: Int, column: Int,
+                      paper: (r: Int, g: Int, b: Int), step: Int) -> Edges? {
+        guard let pixels = DevicePixels(bitmap) else { return nil }
+        let notPaper: ((r: Int, g: Int, b: Int)) -> Mark = { mark($0, paper: paper, step: step) == .paper ? .paper : .fill }
+        guard let across = outermost(pixels.row(row, notPaper), .fill),
+              let down = outermost(pixels.column(column, notPaper), .fill) else { return nil }
+        return Edges(left: across.first, right: across.last, top: down.first, bottom: down.last)
+    }
+
+    enum Mark: Equatable { case paper, line, fill }
+
+    /// With d = paper - pixel on each channel. Paper: no |d| exceeds `step`.
+    /// Line: 5 * (d.r - max(d.g, d.b)) > d.r. Fill: any other pixel that is not paper.
+    /// The look's teal is line; its ink, black, and letters under the veil are fill.
+    static func mark(_ pixel: (r: Int, g: Int, b: Int),
+                     paper: (r: Int, g: Int, b: Int), step: Int) -> Mark {
+        let d = (r: paper.r - pixel.r, g: paper.g - pixel.g, b: paper.b - pixel.b)
+        if abs(d.r) <= step, abs(d.g) <= step, abs(d.b) <= step { return .paper }
+        return 5 * (d.r - max(d.g, d.b)) > d.r ? .line : .fill
+    }
+
+    struct Reading: Equatable {
+        /// The outermost fill pixels of the row and of the column. nil when either holds none.
+        let fill: Edges?
+        /// The first run of line pixels met from each end, three device pixels or longer:
+        /// its outer end and its inner end. nil when a side has no such run.
+        let lineOuter: Edges?
+        let lineInner: Edges?
+    }
+
+    static func reading(in bitmap: CGImage, row: Int, column: Int,
+                        paper: (r: Int, g: Int, b: Int), step: Int) -> Reading {
+        guard let pixels = DevicePixels(bitmap) else { return Reading(fill: nil, lineOuter: nil, lineInner: nil) }
+        let classes: ((r: Int, g: Int, b: Int)) -> Mark = { mark($0, paper: paper, step: step) }
+        let across = pixels.row(row, classes), down = pixels.column(column, classes)
+        var fill: Edges?
+        if let a = outermost(across, .fill), let d = outermost(down, .fill) {
+            fill = Edges(left: a.first, right: a.last, top: d.first, bottom: d.last)
+        }
+        guard let left = lineRun(across, Array(across.indices)),
+              let right = lineRun(across, Array(across.indices.reversed())),
+              let top = lineRun(down, Array(down.indices)),
+              let bottom = lineRun(down, Array(down.indices.reversed())) else {
+            return Reading(fill: fill, lineOuter: nil, lineInner: nil)
+        }
+        return Reading(fill: fill,
+                       lineOuter: Edges(left: left.outer, right: right.outer, top: top.outer, bottom: bottom.outer),
+                       lineInner: Edges(left: left.inner, right: right.inner, top: top.inner, bottom: bottom.inner))
+    }
+
+    /// The first and last index holding `mark`, or nil.
+    static func outermost(_ marks: [Mark], _ mark: Mark) -> (first: Int, last: Int)? {
+        guard let first = marks.firstIndex(of: mark), let last = marks.lastIndex(of: mark) else { return nil }
+        return (first, last)
+    }
+
+    /// Walking `indices` in order, the first run of line pixels three or more long: the index
+    /// where it was met (its outer end) and its last (its inner end). nil when there is none.
+    static func lineRun(_ marks: [Mark], _ indices: [Int]) -> (outer: Int, inner: Int)? {
+        var run: (outer: Int, inner: Int)?
+        for i in indices {
+            if marks[i] == .line {
+                run = (run?.outer ?? i, i)
+            } else if let r = run {
+                if abs(r.inner - r.outer) + 1 >= 3 { return r }
+                run = nil
+            }
+        }
+        if let r = run, abs(r.inner - r.outer) + 1 >= 3 { return r }
+        return nil
     }
 }

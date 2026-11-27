@@ -45,6 +45,7 @@ enum ProductionPageLoop {
         var digests: [PageFilterDigest?] = []
         var modes: [PipelineMode] = []
         var reasons: [TextLayerDetector.FallbackReason?] = []
+        var produced = RunRecord.Produced()
         for page in pages {
             let result: RasterizeResult
             do {
@@ -59,6 +60,7 @@ enum ProductionPageLoop {
             modes.append(result.filterDigest != nil
                 ? .searchableRedaction : .secureRasterization)
             reasons.append(result.fallbackReason)
+            produced.record(result, pageIndex: page.pageIndex)
             try await reconstructor.appendPage(result.pageOutput)
         }
         await reconstructor.finalize()
@@ -69,8 +71,11 @@ enum ProductionPageLoop {
             throw PipelineError.redactionError(.reconstructionFailed)
         }
         _ = try FileManager.default.replaceItemAt(outputURL, withItemAt: tempURL)
+        // The producer's account as the app's run takes it: the rasterizer's
+        // part page by page, then the writer's.
+        produced.record(writer: await reconstructor.produced)
         return RedactionOutcome(
             filterDigests: digests, perPageModes: modes,
-            perPageFallbackReasons: reasons, produced: await reconstructor.produced)
+            perPageFallbackReasons: reasons, produced: produced)
     }
 }

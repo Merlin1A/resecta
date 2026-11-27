@@ -155,7 +155,7 @@ extension DocumentEditorView {
     static let shareIncompleteListHeader = "These checks did not run in full:"
 
     /// One fact line per row, composed from the check's title, the outcome
-    /// and the 1-based pages — "Terms in Text & Bytes: needs review on page
+    /// and the 1-based pages — "Boxed Text in the File: needs review on page
     /// 2" — so the sheet stays content-free: no engine sentence (one of
     /// them names a font) and no matched text.
     static func confirmFactLine(layer: LayerResult, outcome: String) -> String {

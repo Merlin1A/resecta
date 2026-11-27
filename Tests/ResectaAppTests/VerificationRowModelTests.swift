@@ -55,7 +55,7 @@ nonisolated enum RowModelRule: Sendable {
     }
 }
 
-/// THE ORACLE — status → identity ("nil" = no identity) → rule. 7 × 14 rows.
+/// THE ORACLE — status → identity ("nil" = no identity) → rule. 7 × 15 rows.
 /// Neither the query lines nor the page modes decide an outcome: the engine
 /// reports a check with nothing to check as NOT APPLICABLE itself.
 nonisolated let rowModelOracle: [RowModelStatusAxis: [String: RowModelRule]] = [
@@ -73,6 +73,7 @@ nonisolated let rowModelOracle: [RowModelStatusAxis: [String: RowModelRule]] = [
         "hiddenWordInk": .always(.passed),
         "searchRecheck": .always(.passed),
         "detectionSweep": .always(.passed),
+        "boxFill": .always(.passed),
         "nil": .always(.passed),
     ],
     .info: [
@@ -89,6 +90,7 @@ nonisolated let rowModelOracle: [RowModelStatusAxis: [String: RowModelRule]] = [
         "hiddenWordInk": .always(.note),
         "searchRecheck": .always(.note),
         "detectionSweep": .always(.note),
+        "boxFill": .always(.note),
         "nil": .always(.note),
     ],
     .warn: [
@@ -105,6 +107,7 @@ nonisolated let rowModelOracle: [RowModelStatusAxis: [String: RowModelRule]] = [
         "hiddenWordInk": .byFlag(off: .warning, on: .couldNotVerify),
         "searchRecheck": .byFlag(off: .warning, on: .couldNotVerify),
         "detectionSweep": .byFlag(off: .warning, on: .couldNotVerify),
+        "boxFill": .byFlag(off: .warning, on: .couldNotVerify),
         "nil": .byFlag(off: .warning, on: .couldNotVerify),
     ],
     .attention: [
@@ -121,6 +124,7 @@ nonisolated let rowModelOracle: [RowModelStatusAxis: [String: RowModelRule]] = [
         "hiddenWordInk": .always(.needsReview),
         "searchRecheck": .always(.needsReview),
         "detectionSweep": .always(.needsReview),
+        "boxFill": .always(.needsReview),
         "nil": .always(.needsReview),
     ],
     .fail: [
@@ -137,6 +141,7 @@ nonisolated let rowModelOracle: [RowModelStatusAxis: [String: RowModelRule]] = [
         "hiddenWordInk": .always(.failed),
         "searchRecheck": .always(.failed),
         "detectionSweep": .always(.failed),
+        "boxFill": .always(.failed),
         "nil": .always(.failed),
     ],
     .skipped: [
@@ -153,6 +158,7 @@ nonisolated let rowModelOracle: [RowModelStatusAxis: [String: RowModelRule]] = [
         "hiddenWordInk": .always(.couldNotVerify),
         "searchRecheck": .always(.couldNotVerify),
         "detectionSweep": .always(.couldNotVerify),
+        "boxFill": .always(.couldNotVerify),
         "nil": .always(.couldNotVerify),
     ],
     .notApplicable: [
@@ -169,6 +175,7 @@ nonisolated let rowModelOracle: [RowModelStatusAxis: [String: RowModelRule]] = [
         "hiddenWordInk": .always(.nothingToCheck),
         "searchRecheck": .always(.nothingToCheck),
         "detectionSweep": .always(.nothingToCheck),
+        "boxFill": .always(.nothingToCheck),
         "nil": .always(.nothingToCheck),
     ],
 ]
@@ -184,8 +191,8 @@ nonisolated struct RowModelCell: Sendable, CustomTestStringConvertible {
         "\(status) · \(identity?.rawValue ?? "nil") · lines \(hasLines) · \(modes) · cnv \(flag)"
     }
 
-    /// Every cell: 7 statuses × 14 identities × 2 line states × 4 mode
-    /// lists × 2 flag values = 1,568.
+    /// Every cell: 7 statuses × 15 identities × 2 line states × 4 mode
+    /// lists × 2 flag values = 1,680.
     static let all: [RowModelCell] = {
         let identities: [VerificationLayer?] = VerificationLayer.allCases.map { $0 } + [nil]
         var cells: [RowModelCell] = []
@@ -238,10 +245,10 @@ struct VerificationRowModelTests {
         #expect(VerificationRowModel(layer: layer, perPageModes: cell.modes.modes).outcome == expected)
     }
 
-    @Test("The oracle covers 1,568 cells over 98 rules")
+    @Test("The oracle covers 1,680 cells over 105 rules")
     func oracleCoversEveryCell() {
-        #expect(RowModelCell.all.count == 1_568)
-        #expect(rowModelOracle.values.reduce(0) { $0 + $1.count } == 98)
+        #expect(RowModelCell.all.count == 1_680)
+        #expect(rowModelOracle.values.reduce(0) { $0 + $1.count } == 105)
     }
 
     @Test("Items remain only on a Detection Sweep note that carries query lines")
@@ -289,28 +296,67 @@ struct VerificationRowModelTests {
     // MARK: - The copy
 
     static let titles: [(VerificationLayer?, String)] = [
-        (.textExtraction, "Text & Annotations in the Redacted PDF"),
-        (.ocrCheck, "OCR of Page Images"),
-        (.binaryStringSearch, "Terms in Text & Bytes"),
-        (.structureCheck, "Active Content & Structure"),
-        (.metadataCheck, "Document Metadata"),
-        (.spatialVerification, "Character Positions"),
+        (.textExtraction, "Leftover Text & Markup"),
+        (.ocrCheck, "Text Recognition of Each Page"),
+        (.binaryStringSearch, "Boxed Text in the File"),
+        (.structureCheck, "Scripts & Attachments"),
+        (.metadataCheck, "Author & File Details"),
+        (.spatialVerification, "Kept Text Clear of Boxes"),
         (.characterCount, "Character Count"),
-        (.fontVerification, "Monospace Fonts"),
-        (.characterLineage, "Character Sequence"),
-        (.operatorReExtraction, "Terms in Content Streams"),
+        (.fontVerification, "Fonts in the Searchable Copy"),
+        (.characterLineage, "Kept Text Unchanged"),
+        (.operatorReExtraction, "Boxed Text in Drawing Commands"),
         (.hiddenWordInk, "Hidden Words Under Boxes"),
         (.searchRecheck, "Search Re-check"),
         (.detectionSweep, "Detection Sweep"),
+        (.boxFill, "Box Fill"),
         (nil, "Page Count"),
     ]
 
-    @Test("Every identity has its plain-language title; the page-count gate reads Page Count")
-    func titleMapCoversEveryIdentity() {
+    @Test("Every check has its plain name; the page-count gate reads Page Count")
+    func everyCheckHasItsPlainName() {
         #expect(Self.titles.count == VerificationLayer.allCases.count + 1)
         for (identity, title) in Self.titles {
             #expect(VerificationRowModel.title(for: Self.layer(.pass, identity: identity)) == title)
         }
+    }
+
+    /// The names the ten checks shipped with, before their plainer ones.
+    static let shippedNames = [
+        "Text & Annotations in the Redacted PDF", "OCR of Page Images", "Terms in Text & Bytes",
+        "Active Content & Structure", "Document Metadata", "Character Positions", "Monospace Fonts",
+        "Character Sequence", "Terms in Content Streams",
+    ]
+
+    @Test("No shipped check name is left in the app's code, outside comments and the forged engine sentences")
+    func noOldNameIsLeft() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let sources = root.appendingPathComponent("Sources/ResectaApp")
+        let walk = try #require(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
+        var read = 0
+        for case let file as URL in walk where file.pathExtension == "swift" {
+            guard file.lastPathComponent != "VerificationDetailsSection+DebugFixtures.swift" else { continue }
+            read += 1
+            let code = try String(contentsOf: file, encoding: .utf8).split(separator: "\n")
+                .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+                .joined(separator: "\n")
+            for name in Self.shippedNames {
+                #expect(!code.contains(name), "\(file.lastPathComponent) still names \(name)")
+            }
+        }
+        #expect(read > 100, "the walk read the app's sources")
+        let model = try String(contentsOf: sources.appendingPathComponent("Views/VerificationRowModel.swift"), encoding: .utf8)
+        for name in Self.shippedNames { #expect(!model.contains("\"\(name)\""), "the title table quotes \(name)") }
+    }
+
+    @Test("The engine keeps its own names for the checks; only the rows' titles are plainer")
+    func engineNamesUnchanged() {
+        #expect(VerificationLayer.allCases.map(\.name) == [
+            "Text Extraction", "OCR Check", "Binary String Search", "Structure Check", "Metadata Check",
+            "Spatial Verification", "Character Count", "Font Verification", "Character Lineage",
+            "Operator Re-Extraction", "Hidden Words Under Boxes", "Search Re-check", "Detection Sweep", "Box Fill",
+        ])
     }
 
     @Test("An identity-less row named for another check keeps its engine name")
@@ -336,6 +382,7 @@ struct VerificationRowModelTests {
         .hiddenWordInk: "Looks for hidden copies of boxed words.",
         .searchRecheck: "Re-runs your searches on the redacted PDF.",
         .detectionSweep: "Runs the detectors on the redacted PDF.",
+        .boxFill: "Reads each box's fill from the page image.",
     ]
 
     @Test("Every explainer is one line of at most 42 characters")
@@ -358,6 +405,10 @@ struct VerificationRowModelTests {
         }
         #expect(VerificationRowModel.rule(for: .detectionSweep)
                 == "The detectors must report nothing beyond the items you chose to leave.")
+        #expect(VerificationRowModel.rule(for: .boxFill)
+                == "Image blocks each box touches must be exactly the fill in brightness. Margin edges are not confirmed.")
+        #expect(VerificationRowModel.rule(for: .fontVerification)
+                == "Fonts on Searchable pages must be Courier or Menlo, both fixed-width. Any other font fails.")
         #expect(VerificationRowModel.rule(for: Self.layer(.fail("x"), identity: nil))
                 == "Compares the PDF's page count with the original's. The other checks run only when they match.")
     }
@@ -433,8 +484,8 @@ struct VerificationRowModelTests {
         for identity in [VerificationLayer.characterCount, .characterLineage] {
             let model = VerificationRowModel(layer: Self.layer(.skipped, identity: identity), perPageModes: [])
             #expect(model.outcome == .couldNotVerify)
-            #expect(model.caption == "Skipped. No record to compare with.")
-            #expect(model.lead == ["Only a full Redact run saves that record."])
+            #expect(model.caption == "Skipped. This check needs a full Redact run.")
+            #expect(model.lead == ["A full run saves the record it compares with."])
             #expect(model.showsEngineDetail == false)
         }
     }
@@ -569,15 +620,15 @@ struct VerificationRowModelTests {
     func spokenLabelPerOutcome() {
         let cases: [(LayerResult, [PipelineMode], String)] = [
             (Self.layer(.pass, identity: .ocrCheck), [],
-             "OCR of Page Images, Passed. Reads page images against redactions."),
+             "Text Recognition of Each Page, Passed. Reads page images against redactions."),
             (Self.layer(.notApplicable("x"), identity: .characterCount), [.secureRasterization],
              "Character Count, Nothing to check. No Searchable pages to check."),
             (Self.layer(.info("x"), identity: .ocrCheck, short: "Fill artifact on page 1."), [],
-             "OCR of Page Images, Note. Fill artifact on page 1."),
+             "Text Recognition of Each Page, Note. Fill artifact on page 1."),
             (Self.layer(.warn("x"), identity: .structureCheck, short: "A second %%EOF."), [],
-             "Active Content & Structure, Warning. A second %%EOF."),
+             "Scripts & Attachments, Warning. A second %%EOF."),
             (Self.layer(.warn("x"), identity: .ocrCheck, short: "OCR could not be run on 1 page", cnv: true), [],
-             "OCR of Page Images, Could not verify. OCR could not be run on 1 page."),
+             "Text Recognition of Each Page, Could not verify. OCR could not be run on 1 page."),
             (Self.layer(.attention("x"), identity: .searchRecheck, short: "Text remains."), [],
              "Search Re-check, Needs review. Text remains."),
             (Self.layer(.fail("x"), identity: nil, short: "Page count changed."), [],
@@ -597,7 +648,7 @@ struct VerificationRowModelTests {
 
     static let secureChecks: [VerificationLayer] = [
         .textExtraction, .ocrCheck, .binaryStringSearch, .structureCheck, .metadataCheck,
-        .searchRecheck, .detectionSweep,
+        .searchRecheck, .detectionSweep, .boxFill,
     ]
     static let secure: [PipelineMode] = [.secureRasterization, .secureRasterization]
     static let searchable: [PipelineMode] = [.searchableRedaction, .searchableRedaction]
@@ -622,33 +673,33 @@ struct VerificationRowModelTests {
 
     /// The eleven summary lines of the merged design, one per report shape.
     static let summaries: [(VerificationReport, String)] = [
-        (report(secureChecks, secure), "7 of 7 checks passed"),
-        (report(secureChecks, secure, .pass, [.detectionSweep: sweepNote]), "6 of 7 checks passed · 1\u{00A0}note"),
+        (report(secureChecks, secure), "8 of 8 checks passed"),
+        (report(secureChecks, secure, .pass, [.detectionSweep: sweepNote]), "7 of 8 checks passed · 1\u{00A0}note"),
         (report(secureChecks, secure, .pass, [.detectionSweep: sweepNote, .searchRecheck: idleRecheck]),
-         "5 of 6 checks passed · 1\u{00A0}note · 1\u{00A0}had nothing to check"),
-        (report(all, searchable), "13 of 13 checks passed"),
-        (report(all, secure, .pass, noTextLayer), "10 of 10 checks passed · 3\u{00A0}had nothing to check"),
+         "6 of 7 checks passed · 1\u{00A0}note · 1\u{00A0}had nothing to check"),
+        (report(all, searchable), "14 of 14 checks passed"),
+        (report(all, secure, .pass, noTextLayer), "11 of 11 checks passed · 3\u{00A0}had nothing to check"),
         (report(all, searchable, .warn("x"), [
             .spatialVerification: layer(.warn("x"), identity: .spatialVerification),
             .ocrCheck: layer(.info("x"), identity: .ocrCheck)]),
-         "11 of 13 checks passed · 1\u{00A0}warning · 1\u{00A0}note"),
+         "12 of 14 checks passed · 1\u{00A0}warning · 1\u{00A0}note"),
         (report(all, searchable, .warn("x"), [
             .ocrCheck: layer(.warn("x"), identity: .ocrCheck, cnv: true), .searchRecheck: idleRecheck]),
-         "11 of 12 checks passed · 1\u{00A0}could not verify · 1\u{00A0}had nothing to check"),
+         "12 of 13 checks passed · 1\u{00A0}could not verify · 1\u{00A0}had nothing to check"),
         (report(all, searchable, .attention("x"), [
             .binaryStringSearch: layer(.attention("x"), identity: .binaryStringSearch, terms: ["Delia"]),
             .ocrCheck: layer(.warn("x"), identity: .ocrCheck, cnv: true),
             .spatialVerification: layer(.warn("x"), identity: .spatialVerification),
             .searchRecheck: idleRecheck]),
-         "9 of 12 checks passed · 1\u{00A0}needs review · 1\u{00A0}warning · 1\u{00A0}could not verify"
+         "10 of 13 checks passed · 1\u{00A0}needs review · 1\u{00A0}warning · 1\u{00A0}could not verify"
             + " · 1\u{00A0}had nothing to check"),
         (report(secureChecks, secure, .fail("x"), [.metadataCheck: layer(.fail("x"), identity: .metadataCheck)]),
-         "6 of 7 checks passed · 1\u{00A0}failed"),
+         "7 of 8 checks passed · 1\u{00A0}failed"),
         (report(all, searchable, .warn("x"), [
             .characterCount: layer(.skipped, identity: .characterCount),
             .characterLineage: layer(.skipped, identity: .characterLineage),
             .ocrCheck: layer(.info("x"), identity: .ocrCheck)]),
-         "10 of 13 checks passed · 2\u{00A0}could not verify · 1\u{00A0}note"),
+         "11 of 14 checks passed · 2\u{00A0}could not verify · 1\u{00A0}note"),
         (VerificationReport(layers: [layer(.fail("x"), identity: nil)], overallStatus: .fail("x"),
                             durationSeconds: 0),
          "0 of 1 check passed · 1\u{00A0}failed"),
@@ -674,7 +725,7 @@ struct VerificationRowModelTests {
         ]
         #expect(VerificationResultsView.detailsSummaryText(for: Self.report(Self.secureChecks, Self.secure,
                                                                             .fail("x"), one))
-                == "1 of 6 checks passed · 1\u{00A0}failed · 1\u{00A0}needs review · 1\u{00A0}warning"
+                == "2 of 7 checks passed · 1\u{00A0}failed · 1\u{00A0}needs review · 1\u{00A0}warning"
                 + " · 1\u{00A0}could not verify · 1\u{00A0}note · 1\u{00A0}had nothing to check")
         let pairs: [VerificationLayer: LayerResult] = [
             .textExtraction: Self.layer(.fail("x"), identity: .textExtraction),
@@ -691,7 +742,7 @@ struct VerificationRowModelTests {
             .searchRecheck: Self.idleRecheck,
         ]
         #expect(VerificationResultsView.detailsSummaryText(for: Self.report(Self.all, Self.secure, .fail("x"), pairs))
-                == "1 of 11 checks passed · 2\u{00A0}failed · 2\u{00A0}need review · 2\u{00A0}warnings"
+                == "2 of 12 checks passed · 2\u{00A0}failed · 2\u{00A0}need review · 2\u{00A0}warnings"
                 + " · 2\u{00A0}could not verify · 2\u{00A0}notes · 2\u{00A0}had nothing to check")
     }
 
@@ -723,7 +774,7 @@ struct VerificationRowModelTests {
                     .rule(VerificationRowModel.rule(for: .characterCount)), .detail("Engine detail."), took])
         // Skipped: the lead first; no engine detail (it names a reason that does not apply).
         #expect(items(Self.layer(.skipped, identity: .characterLineage))
-                == [.lead("Only a full Redact run saves that record."),
+                == [.lead("A full run saves the record it compares with."),
                     .explainer("Compares kept characters with the record."),
                     .rule(VerificationRowModel.rule(for: .characterLineage)), took])
         // The sweep note: its lines and its pages; its time is the re-check's.
@@ -736,7 +787,7 @@ struct VerificationRowModelTests {
                 == [.rule(VerificationRowModel.pageCountGateRule), took])
     }
 
-    @Test("Terms in Content Streams says where its scan stopped when later pages exist")
+    @Test("Boxed Text in Drawing Commands says where its scan stopped when later pages exist")
     func contentStreamStopLine() {
         let row = Self.layer(.attention("x"), identity: .operatorReExtraction, pages: [1], terms: ["Delia"])
         let modes: [PipelineMode] = [.searchableRedaction, .searchableRedaction, .searchableRedaction]
@@ -768,7 +819,7 @@ struct VerificationRowModelTests {
                               lines: [line("\u{201C}Delia\u{201D}", 1), line("\u{201C}Fox\u{201D}", 0)]),
             perPageModes: [])
         #expect(one.caption == "Your search \u{201C}Delia\u{201D} still has 1 match on\u{00A0}page\u{00A0}2.")
-        #expect(one.lead == ["Run it again with OCR on to redact the rest."])
+        #expect(one.lead == ["Run it again with Include OCR Pages on to redact the rest."])
         #expect(one.captionIsPrivacySensitive)
         let two = VerificationRowModel(
             layer: Self.layer(.attention("x"), identity: .searchRecheck, pages: [0, 1],
@@ -776,7 +827,7 @@ struct VerificationRowModelTests {
             perPageModes: [])
         #expect(two.caption == "Your searches \u{201C}Delia\u{201D} and \u{201C}\\d{4}\u{201D} still have 3 matches "
                 + "on pages 1\u{00A0}and\u{00A0}2.")
-        #expect(two.lead == ["Run them again with OCR on to redact the rest."])
+        #expect(two.lead == ["Run them again with Include OCR Pages on to redact the rest."])
     }
 
     @Test("The spoken pages: up to five, then four and a count")

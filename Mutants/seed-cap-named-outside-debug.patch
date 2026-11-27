@@ -1,0 +1,18 @@
+Property: The run quality cap's debug seed is named only inside #if DEBUG, so a release build carries none of it.
+Area: the debug seeds' DEBUG-only pin
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DebugSeedOptionsTests
+Must go red: ResectaAppTests/DebugSeedOptionsTests seedsAreReadOnlyInsideDebug
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineCoordinator.swift b/Sources/ResectaApp/State/PipelineCoordinator.swift
+index 5586655e5..481326f97 100644
+--- a/Sources/ResectaApp/State/PipelineCoordinator.swift
++++ b/Sources/ResectaApp/State/PipelineCoordinator.swift
+@@ -30,6 +30,7 @@ final class PipelineCoordinator: @unchecked Sendable {
+     /// UIApplication.didReceiveMemoryWarningNotification fires (observer
+     /// owned by the coordinator; torn down in deinit). Default 300.
+     var dpiCap: Int = defaultDPICap
++    static let pinnedCapArgument = "--pinRunQualityCap="
+ 
+     /// Hard cap on rasterization parallelism for the rest of the
+     /// workspace's lifetime. Nil means "use the dynamic bound"; `1`

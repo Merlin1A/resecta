@@ -54,7 +54,7 @@ struct VerificationCheckCountTests {
         #expect(examined == 16)
         // The seeded run with three checks that had nothing to check: full.
         let rasterized = try #require(Self.ringNumbers(VerificationDebugFixtures.searchableAllRasterized))
-        #expect(rasterized.passed == 10 && rasterized.total == 10)
+        #expect(rasterized.passed == 11 && rasterized.total == 11)
     }
 
     @Test("The second number is one number everywhere it is drawn or spoken")

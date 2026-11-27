@@ -501,12 +501,24 @@ struct SandwichVerificationTests {
                     return docs
                 },
                 events: { _ in })
-            #expect(report.overallStatus == .pass, "\(mode): overall \(report.overallStatus)")
+            // This run is built without the app's run record, so Box Fill reads
+            // Skipped (no record to compare with), and the overall status is the
+            // skipped-checks warning; every other layer passes, as the loop shows.
+            #expect(report.layers.first { $0.layer == .boxFill }?.status == .skipped,
+                    "\(mode): Box Fill with no record")
+            #expect(report.overallStatus == .warn("Some verification checks were skipped — results may be incomplete"),
+                    "\(mode): overall \(report.overallStatus)")
+            // `==` on a status compares its case only; the sentence is held here.
+            if case .warn(let sentence) = report.overallStatus {
+                #expect(sentence == "Some verification checks were skipped — results may be incomplete")
+            }
             #expect(report.layers.count == VerificationEngine().layers(for: mode).count,
                     "\(mode): every layer of the mode reports")
             for result in report.layers {
                 switch result.status {
                 case .pass:
+                    break
+                case .skipped where result.layer == .boxFill:
                     break
                 case .info, .notApplicable:
                     #expect(result.layer.map(Self.layersWithNothingToCheckOnAFullPage.contains) == true,
