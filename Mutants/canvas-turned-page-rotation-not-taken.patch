@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/CanvasTurnedPageTests dragIsStoredInTheShownFrame; 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
-index 570bbb8..b0edca3 100644
+index 66c1886c7..15d120bbe 100644
 --- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
 +++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
-@@ -280,7 +280,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+@@ -308,7 +308,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
          // The app shows the crop box and never sets another display box, so
          // the geometry's crop and the page size below read one box.
          assert(PDFDisplayBox.cropBox == view.displayBox)
@@ -16,4 +16,4 @@ index 570bbb8..b0edca3 100644
 +        overlay.geometry = RunRecord.PageGeometry(cropBox: page.bounds(for: view.displayBox), rotation: 0)
          overlay.pageSize = page.bounds(for: view.displayBox).size
          overlay.coordinator = self
-         overlay.isUserInteractionEnabled = isDrawingEnabled
+         overlay.startReader = firstEditStartReader(pageIndex: pageIndex)
