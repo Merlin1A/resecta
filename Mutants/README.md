@@ -861,3 +861,7 @@ with its reason and the mutant that is caught in its place.
 | `check-name-engine-renamed-too.patch` | The engine's own name for a check is not renamed with its row. | ResectaAppTests/VerificationRowModelTests engineNamesUnchanged |
 | `check-step-plural-says-ocr-on.patch` | The step on searches that still match names the Include OCR Pages switch in both forms. | ResectaAppTests/VerificationRowModelTests recheckReviewCaption |
 | `check-skipped-caption-shipped.patch` | A skipped check's caption says it needs a full Redact run. | ResectaAppTests/VerificationRowModelTests skippedRow |
+| `witness-correction-turned-over.patch` | A preview reading on a page whose size in pixels is not whole is scaled by picture x 72 / (quality x side), not by its inverse. | ResectaAppUITests/WitnessMeasureTests testCorrectedOnAnA4WidthAt150AndALetterWidth |
+| `seed-cap-named-outside-debug.patch` | The run quality cap's debug seed is named only inside #if DEBUG, so a release build carries none of it. | ResectaAppTests/DebugSeedOptionsTests seedsAreReadOnlyInsideDebug |
+| `cap-written-a-fourth-time.patch` | Three code lines write the run's quality cap (its declaration, the memory warning and the DEBUG launch hook), and no other. | ResectaAppTests/DebugArgumentsAreDebugOnlyTests theCapHasThreeWriters |
+| `scan-every-not-paper-pixel-is-fill.patch` | The classed reading tells the teal line from the fill, so an outline with nothing inside reads as no fill. | ResectaAppUITests/EdgeScanTests testAnOutlineWithNoFillInsideTheWindowGivesNoFillEdges |

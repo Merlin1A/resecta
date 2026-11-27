@@ -5,16 +5,16 @@ Must go red: ResectaAppUITests/ShareRiskSheetUITests testVerifySettingLeftOff_ne
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/App/ResectaApp.swift b/Sources/ResectaApp/App/ResectaApp.swift
-index 064462a5..b7b7c246 100644
+index 4f6dacb0f..417f4e794 100644
 --- a/Sources/ResectaApp/App/ResectaApp.swift
 +++ b/Sources/ResectaApp/App/ResectaApp.swift
-@@ -116,9 +116,6 @@ struct ResectaApp: App {
+@@ -120,9 +120,6 @@ struct ResectaApp: App {
          } else if CommandLine.arguments.contains("--uitesting") {
              defaults.set(true, forKey: FirstLaunchFlow.agreementKey)
              defaults.removeObject(forKey: "search.lastFilter.v1")
 -            if !CommandLine.arguments.contains("--keepVerifySetting") {
 -                defaults.removeObject(forKey: "autoVerify")
 -            }
+             defaults.removeObject(forKey: "fillColor")
+             defaults.removeObject(forKey: "exportDPI")
          }
-         // The first-time line: a test launch sets its flag, so no suite meets
-         // the line, unless it asks for a fresh one or for the stored value.

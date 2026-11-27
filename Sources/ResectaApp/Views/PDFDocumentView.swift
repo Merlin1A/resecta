@@ -250,6 +250,16 @@ final class FitFlooredPDFView: PDFView {
         onLayout?()
     }
 
+    #if DEBUG
+    /// Under `--canvasReadOut` only, the read-out a screen test measures the
+    /// page's place on screen by (`FitFlooredPDFView+ReadOut.swift`);
+    /// otherwise the view's own value.
+    override var accessibilityValue: String? {
+        get { Self.readOutIsOn ? readOut() : super.accessibilityValue }
+        set { super.accessibilityValue = newValue }
+    }
+    #endif
+
 
     // MARK: - Edit menu
 
