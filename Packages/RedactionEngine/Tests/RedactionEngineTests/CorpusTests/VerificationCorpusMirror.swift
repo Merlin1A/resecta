@@ -437,7 +437,7 @@ extension VerificationCorpusRunnerTests {
         sourceDocument: SendablePDFDocument? = nil
     ) async throws -> VerificationReport {
         guard let sharedDoc = PDFDocument(url: outputURL) else {
-            throw PipelineError.verificationError(.engineCrash(layerIndex: 0))
+            throw PipelineError.verificationError(.engineCrash(check: nil))
         }
         let wrapped = SendablePDFDocument(sharedDoc)
         return try await VerificationOrchestrator().run(

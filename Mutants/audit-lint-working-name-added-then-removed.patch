@@ -1,0 +1,17 @@
+Property: A working name that one commit of a range adds to a test JSON and a later commit removes fails the lint (AL-6, the commit pass).
+Area: the pre-commit lint (Scripts/audit-lint.sh), range mode
+Test command (from the worktree root; the two commits are made with plumbing, so no hook runs): git apply --cached Mutants/audit-lint-working-name-added-then-removed.patch && c1=$(git commit-tree "$(git write-tree)" -p HEAD -m plant) && git apply --cached -R Mutants/audit-lint-working-name-added-then-removed.patch && c2=$(git commit-tree "$(git write-tree)" -p "$c1" -m unplant) && Scripts/audit-lint.sh --range "HEAD..$c2"
+Must go red: Scripts/audit-lint.sh exits 1 with one offence, the line "AL-6 planning shorthand (working name): Tests/ResectaAppTests/Cases/box-walk-order.json:3: ... (in commit <c1>)"; the range's whole diff is empty
+Apply in a scratch worktree as the test command does; discard after.
+
+diff --git a/Tests/ResectaAppTests/Cases/box-walk-order.json b/Tests/ResectaAppTests/Cases/box-walk-order.json
+index 41f93c517..771413844 100644
+--- a/Tests/ResectaAppTests/Cases/box-walk-order.json
++++ b/Tests/ResectaAppTests/Cases/box-walk-order.json
+@@ -1,5 +1,6 @@
+ {
+   "rule": "box-walk-order",
++  "notes": "leader-9 moved the order",
+   "units": "each region's stored rectangle, top-left origin, in page points (any one unit per page gives the same order); created: the region's place in its page's stored array; indexes into the walk's order",
+   "cases": [
+     {

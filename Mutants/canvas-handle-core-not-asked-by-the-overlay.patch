@@ -1,0 +1,20 @@
+Property: The overlay asks the hit test with the handle core. Planted: it asks without one, so another box's body takes the touch again.
+Area: the canvas, the selected box's handle core
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasHitTargetTests
+Must go red: ResectaAppTests/CanvasHitTargetTests overlayPassesTheCore; ResectaAppTests/CanvasHitTargetTests handleCoreOverAnotherBoxsBody
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
+index 776d6ef..8eee6f8 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
+@@ -356,8 +356,7 @@ extension RedactionOverlayView {
+             handleSize: ResectaTokens.TouchTarget.minimum * fingerScale,
+             minimumHandleSize: 22 * fingerScale,
+             containerBounds: bounds,
+-            fingerScale: fingerScale,
+-            coreSize: ResectaTokens.Canvas.handleCore * fingerScale)
++            fingerScale: fingerScale)
+     }
+ 
+     func hitTestRegion(at point: CGPoint) -> RedactionRegion? {

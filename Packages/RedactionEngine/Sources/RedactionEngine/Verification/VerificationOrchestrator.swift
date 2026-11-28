@@ -141,7 +141,7 @@ public struct VerificationOrchestrator: Sendable {
         // run ends with the error raised for an output that cannot be
         // loaded, never a report.
         guard outputDocument.document.pageCount > 0 else {
-            throw PipelineError.verificationError(.engineCrash(layerIndex: 0))
+            throw PipelineError.verificationError(.engineCrash(check: nil))
         }
 
         // `layers` is the canonical (report) order; the count is derived.
@@ -276,9 +276,8 @@ public struct VerificationOrchestrator: Sendable {
     /// The report from the schedule and the results the phases stored: one
     /// result per scheduled check, in the schedule's (canonical) order. A
     /// scheduled check that stored no result ends the run with the error
-    /// raised for an output that cannot be verified, its position in the
-    /// schedule as the index, never a report that lists fewer checks than
-    /// were scheduled.
+    /// raised for an output that cannot be verified, naming that check,
+    /// never a report that lists fewer checks than were scheduled.
     func assembleReport(
         layers: [VerificationLayer],
         resultsByLayer: [VerificationLayer: LayerResult],
@@ -288,9 +287,9 @@ public struct VerificationOrchestrator: Sendable {
     ) throws -> VerificationReport {
         var orderedResults: [LayerResult] = []
         orderedResults.reserveCapacity(layers.count)
-        for (position, layer) in layers.enumerated() {
+        for layer in layers {
             guard let result = resultsByLayer[layer] else {
-                throw PipelineError.verificationError(.engineCrash(layerIndex: position))
+                throw PipelineError.verificationError(.engineCrash(check: layer))
             }
             orderedResults.append(result)
         }

@@ -333,7 +333,7 @@ struct FailedStatePrimaryActionTests {
             .importError(.passwordProtected),
             .detectionError(.ocrUnavailable),
             .redactionError(.reconstructionFailed),
-            .verificationError(.engineCrash(layerIndex: 0)),
+            .verificationError(.engineCrash(check: nil)),
             .exportError(.diskFull),
             .exportError(.writeFailed),
             .exportError(.filePurged),
@@ -431,14 +431,21 @@ struct RunFactsStripTests {
             .degradeLine(failedGazetteers: ["NameGazetteer"]))
     }
 
-    @Test("The strip has no detection-disclosure line — the two remaining facts are the run's own")
+    @Test("The strip has no detection-disclosure line — every line is one of the run's own facts")
     func stripCarriesOnlyRunFacts() {
-        // Every line the strip can render comes from the two facts below;
-        // a search-only or manual-only run with neither renders no strip.
+        // Every line the strip can render comes from a fact below, recorded
+        // with the run, or from the report shown; a run with none renders no
+        // strip.
         let every = VerificationResultsView.RunFacts(
-            ocrSkippedPages: [0], degradeFailures: ["NameGazetteer"])
-        let lines = VerificationResultsView.RunFactsStrip.lines(for: every)
-        #expect(lines.count == 2)
+            ocrSkippedPages: [0], degradeFailures: ["NameGazetteer"], runMode: .secure, pageCount: 81,
+            burnedBoxes: 2, outputBytes: 1_000, pagesNotSearchedInFull: [0], smallPicturePages: [1])
+        let report = VerificationReport(layers: [LayerResult(
+            name: "Check", symbolName: "checkmark", status: .pass, shortDescription: "", detailDescription: "",
+            pageReferences: nil, durationSeconds: 0)], overallStatus: .pass, durationSeconds: 0)
+        let lines = VerificationResultsView.RunFactsStrip.lines(for: every, report: report, outputExists: true)
+        #expect(lines.count == 8)
+        #expect(VerificationResultsView.RunFactsStrip.lines(for: VerificationResultsView.RunFacts(
+            ocrSkippedPages: [0], degradeFailures: ["NameGazetteer"])).count == 2)
         #expect(!lines.contains { $0.contains("Automated detection did not run") })
         #expect(!lines.contains { $0.contains("Search or manual marking") })
     }
@@ -527,7 +534,18 @@ struct RunFactsStripTests {
                 failedGazetteers: ["NameGazetteer"]),
             VerificationResultsView.RunFactsStrip.degradeLine(
                 failedGazetteers: [GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue]),
-        ]
+            VerificationResultsView.RunFactsStrip.boxesLine(count: 1),
+            VerificationResultsView.RunFactsStrip.boxesLine(count: 19),
+            VerificationResultsView.RunFactsStrip.sizeLine(bytes: 38_200_000),
+            VerificationResultsView.RunFactsStrip.longImageOnlyLine(pages: 140),
+            VerificationResultsView.RunFactsStrip.notSearchedInFullLine(pages: 1),
+            VerificationResultsView.RunFactsStrip.notSearchedInFullLine(pages: 12),
+            VerificationResultsView.RunFactsStrip.smallPicturesLine(pages: 1),
+            VerificationResultsView.RunFactsStrip.smallPicturesLine(pages: 38),
+            VerificationResultsView.RunFactsStrip.checksRanLine(pages: 1),
+            VerificationResultsView.RunFactsStrip.checksRanLine(pages: 2),
+            VerificationResultsView.RunFactsStrip.checksRanLine(pages: 48),
+        ] + ResultsScopeNote.checksPassedSentences(outputExists: true)
         // Forbidden absolutes assembled from halves so this source does
         // not itself trip the M-1 sweep (mirrors Q11TruthLegibilityTests
         // .subtitleIsMechanism).

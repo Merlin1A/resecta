@@ -9,10 +9,12 @@ import RedactionEngine
 // apart at the fit zoom, and every box answers within a halo of 8 screen
 // points, so a touch on one line also lands in its neighbour's halo; a
 // whole-page box covers every box inside it. The touch picks, in order: the
-// selected box's handle when the point is in no other box's body; else the
-// smallest box whose body holds the point; else the box whose edge is
-// nearest within the halo. Read here through the real overlay, coordinator
-// and state at the fit scale (0.64, so the halo is 12.5 page points).
+// selected box's handle within 22 screen points of where it is drawn (its
+// core), over another box's body too; else the selected box's handle when
+// the point is in no other box's body; else the smallest box whose body
+// holds the point; else the box whose edge is nearest within the halo. Read
+// here through the real overlay, coordinator and state at the fit scale
+// (0.64, so the halo is 12.5 page points and the core 34.4).
 
 @Suite("Canvas hit target")
 @MainActor
@@ -91,17 +93,45 @@ struct CanvasHitTargetTests {
         withExtendedLifetime(m) {}
     }
 
-    @Test("A selected box's handle box over another box's body picks that other box, never the handle")
-    func handleNeverTakesAnotherBoxsBody() {
+    @Test("A selected box's handle core over another box's body takes the handle; past the core, the other box")
+    func handleCoreOverAnotherBoxsBody() {
         let selected = Self.region(CGRect(x: 100, y: 300, width: 200, height: 100))
         // A small box sitting on the selected box's bottom-right corner.
         let other = Self.region(CGRect(x: 290, y: 395, width: 60, height: 20))
         let m = mounted([selected, other], selectedIDs: [selected.id])
+        // 5 points from the corner, inside its core (half 17.19 page points at fit).
         let point = CGPoint(x: 305, y: 405)
-        #expect(m.overlay.hitTestResizeHandle(at: point) == nil)
+        #expect(m.overlay.hitTestResizeHandle(at: point) == .bottomRight)
         #expect(m.overlay.hitTestRegion(at: point)?.id == other.id)
+        // 18 points out, past the core, on the other box: the other box.
+        #expect(m.overlay.hitTestResizeHandle(at: CGPoint(x: 318, y: 405)) == nil)
         // Off the other box, the corner is still the selected box's handle.
         #expect(m.overlay.hitTestResizeHandle(at: CGPoint(x: 296, y: 388)) == .bottomRight)
+        withExtendedLifetime(m) {}
+    }
+
+    @Test("The handle core is 22 on-screen points at every zoom: 15 points off the corner is inside it at fit, outside it at 3.5 × fit")
+    func handleCoreScalesWithZoom() {
+        let selected = Self.region(CGRect(x: 100, y: 300, width: 200, height: 100))
+        let other = Self.region(CGRect(x: 290, y: 395, width: 60, height: 20))
+        let m = mounted([selected, other], selectedIDs: [selected.id])
+        let point = CGPoint(x: 315, y: 405)
+        #expect(m.overlay.hitTestResizeHandle(at: point) == .bottomRight)
+        // At 3.5 × fit the core's half is 4.91 page points: the other box's body.
+        m.overlay.snapZoomScaleOverride = Self.fitScale * 3.5
+        #expect(m.overlay.hitTestResizeHandle(at: point) == nil)
+        #expect(m.overlay.hitTestRegion(at: point)?.id == other.id)
+        withExtendedLifetime(m) {}
+    }
+
+    @Test("The overlay asks with the core: on the other box, 5 points from the corner at fit and 2 at 3.5 × fit take the handle")
+    func overlayPassesTheCore() {
+        let selected = Self.region(CGRect(x: 100, y: 300, width: 200, height: 100))
+        let other = Self.region(CGRect(x: 290, y: 395, width: 60, height: 20))
+        let m = mounted([selected, other], selectedIDs: [selected.id])
+        #expect(m.overlay.hitTestResizeHandle(at: CGPoint(x: 305, y: 405)) == .bottomRight)
+        m.overlay.snapZoomScaleOverride = Self.fitScale * 3.5
+        #expect(m.overlay.hitTestResizeHandle(at: CGPoint(x: 302, y: 402)) == .bottomRight)
         withExtendedLifetime(m) {}
     }
 
@@ -149,7 +179,7 @@ struct CanvasHitTargetTests {
             at: point, regions: boxes.map { (id: $0.0, rect: $0.1) },
             selected: selected.map { (id: $0.0, rect: $0.1) }, halo: Self.halo,
             handleSize: 44 / Self.fitScale, minimumHandleSize: 22 / Self.fitScale,
-            containerBounds: CGRect(origin: .zero, size: Self.pageSize))
+            containerBounds: CGRect(origin: .zero, size: Self.pageSize), coreSize: 22 / Self.fitScale)
     }
 
     @Test("The rule: the body before the halo, the smallest body, the nearest edge, the later box on a tie")
@@ -166,13 +196,13 @@ struct CanvasHitTargetTests {
         #expect(resolve(CGPoint(x: 50, y: 60), [(a, upper), (b, lower), (c, CGRect(x: 0, y: 200, width: 10, height: 10))]) == nil, "outside every halo")
     }
 
-    @Test("The rule: the selected box's handle only off every other box's body")
-    func handleOffOtherBodies() {
+    @Test("The rule: the selected box's handle off every other box's body, and within its core over one")
+    func handleOffOtherBodiesOrInItsCore() {
         let sel = UUID(), other = UUID()
         let selRect = CGRect(x: 100, y: 300, width: 200, height: 100)
         let otherRect = CGRect(x: 290, y: 395, width: 60, height: 20)
         #expect(resolve(CGPoint(x: 296, y: 388), [(sel, selRect), (other, otherRect)], selected: (sel, selRect)) == .handle(.bottomRight))
-        #expect(resolve(CGPoint(x: 305, y: 405), [(sel, selRect), (other, otherRect)], selected: (sel, selRect)) == .region(other))
+        #expect(resolve(CGPoint(x: 305, y: 405), [(sel, selRect), (other, otherRect)], selected: (sel, selRect)) == .handle(.bottomRight), "within the corner's core, over the other box")
         #expect(resolve(CGPoint(x: 200, y: 350), [(sel, selRect), (other, otherRect)], selected: (sel, selRect)) == .region(sel), "the selected box's own body is the body")
     }
 

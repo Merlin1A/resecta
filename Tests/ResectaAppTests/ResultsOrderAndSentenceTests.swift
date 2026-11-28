@@ -161,7 +161,7 @@ struct ResultsOrderAndSentenceTests {
     func theViewsFollowTheOrder() throws {
         let results = try Self.source("VerificationResultsView.swift")
         let hand = try #require(results.range(of: "ResultsFindingsSection("))
-        let small = try #require(results.range(of: "ResultsScopeNote(report: report, sentences: Self.smallPrint)"))
+        let small = try #require(results.range(of: "ResultsScopeNote(report: report, sentences: smallPrint)"))
         let section = try #require(results.range(of: "VerificationDetailsSection("))
         #expect(hand.lowerBound < small.lowerBound && small.lowerBound < section.lowerBound)
         #expect(results.components(separatedBy: "ResultsScopeNote(").count == 2)

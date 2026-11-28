@@ -1,0 +1,18 @@
+Property: A check that stopped before it had read everything means the checks did not run to the end.
+Area: the results screen's line about what the checks ran on
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ResultsRunLinesTests
+Must go red: ResectaAppTests/ResultsRunLinesTests checksRanToTheEnd
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/ResultsRunLines.swift b/Sources/ResectaApp/Views/ResultsRunLines.swift
+--- a/Sources/ResectaApp/Views/ResultsRunLines.swift
++++ b/Sources/ResectaApp/Views/ResultsRunLines.swift
+@@ -84,7 +84,7 @@ extension VerificationResultsView.RunFactsStrip {
+         !report.layers.isEmpty && report.layers.allSatisfy { layer in
+             switch layer.status {
+             case .pass, .info, .notApplicable:
+-                !layer.couldNotVerify && layer.couldNotVerifyPart == nil && layer.stopped == nil
++                !layer.couldNotVerify && layer.couldNotVerifyPart == nil
+             case .warn, .attention, .fail, .skipped:
+                 false
+             }

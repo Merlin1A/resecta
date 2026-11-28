@@ -52,6 +52,7 @@ struct MessageHostTests {
         "Views/SettingsView.swift": [2, 2, 0],
         "Views/FailedStateView.swift": [1, 1, 0],
         "Views/ShareRiskConfirm.swift": [1, 1, 0],
+        "Views/VerificationResultsView.swift": [1, 1, 0],
         "Views/EULAGateView.swift": [1, 0, 0],
         "Views/EditorAnnouncementObservers.swift": [1, 0, 0],
     ]

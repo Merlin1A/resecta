@@ -1,0 +1,23 @@
+Property: Within a handle core, on the selected box itself, no box beneath takes the touch. Planted: there the rule without the core decides, so a smaller box beneath takes it.
+Area: the canvas, the selected box's handle core
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasHandleCoreTests
+Must go red: ResectaAppTests/CanvasHandleCoreTests tableRow
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
+index 776d6ef..7900d67 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
+@@ -311,11 +311,7 @@ extension RedactionOverlayView {
+                    let rdx = rhs.1.x - point.x, rdy = rhs.1.y - point.y
+                    return (ldx * ldx + ldy * ldy) < (rdx * rdx + rdy * rdy)
+                }) {
+-            guard selected.rect.contains(point) else { return .handle(core.0) }
+-            return resolveResizeHandle(
+-                at: point, regionRect: selected.rect, targetHandleSize: handleSize,
+-                minimumHandleSize: minimumHandleSize, containerBounds: containerBounds,
+-                fingerScale: fingerScale).map { .handle($0) } ?? .region(selected.id)
++            if !selected.rect.contains(point) { return .handle(core.0) }
+         }
+         if let selected,
+            !regions.contains(where: { $0.id != selected.id && $0.rect.contains(point) }),
