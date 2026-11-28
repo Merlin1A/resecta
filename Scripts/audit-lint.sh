@@ -6,8 +6,9 @@
 # silent test guards on added lines ·
 # planning shorthand on added lines: a register-identifier token, a section
 # sign with no standard or repository document named beside it, a Markdown
-# file name the repository does not track, a planning-process word, a step
-# token or the maintainer's first name in a comment), and AL-7, a whole-tree
+# file name the repository does not track, a package key, a working name, a
+# planning-process word, a step token or the maintainer's first name in a
+# comment, and a planning word in a test or source resource), and AL-7, a whole-tree
 # refusal of PDFPage.characterBounds(at:) in the shipping source — numbering note at
 # the AL-1 section below.
 # Symlinked into .git/hooks/pre-commit by install-hooks.sh.
@@ -25,7 +26,10 @@
 # the staged diff for the commit range A..B — the same rules over the lines
 # the range adds, with the file list, the added-line scan and the new-file
 # list all read from `git diff A..B`. AL-1 (pbxproj freshness) is skipped in
-# range mode: the pbxproj is gitignored and CI regenerates it first.
+# range mode: the pbxproj is gitignored and CI regenerates it first. AL-6
+# also reads each commit of the range on its own (`git diff-tree`), since a
+# merge keeps its branch's commits: a line one commit adds and a later one
+# removes is still in the history the range publishes.
 #
 # Usage: Scripts/audit-lint.sh                 (staged mode; the pre-commit hook)
 #        Scripts/audit-lint.sh --range A..B    (range mode; the pull-request gate)
@@ -69,6 +73,8 @@ if [ -n "$RANGE" ]; then
     RANGE_BASE="${RANGE%%..*}"
     git rev-parse --verify --quiet "${RANGE_BASE}^{commit}" >/dev/null \
         || { echo "audit-lint: range base '$RANGE_BASE' is not a commit" >&2; exit 64; }
+    git rev-parse --verify --quiet "${RANGE##*..}^{commit}" >/dev/null \
+        || { echo "audit-lint: range end '${RANGE##*..}' is not a commit" >&2; exit 64; }
 fi
 
 # The three git sources of truth, staged (hook) or ranged (CI).
@@ -76,8 +82,9 @@ diff_names() { # diff-filter
     if [ -n "$RANGE" ]; then git diff --name-only --diff-filter="$1" "$RANGE"
     else git diff --cached --name-only --diff-filter="$1"; fi
 }
-diff_added_hunks() { # path
-    if [ -n "$RANGE" ]; then git diff -U0 --no-color "$RANGE" -- "$1"
+diff_added_hunks() { # path; with AL6_COMMIT set, that commit's own diff (AL-6's commit pass)
+    if [ -n "${AL6_COMMIT:-}" ]; then git diff-tree -p -U0 --no-color --no-commit-id --root "$AL6_COMMIT" -- "$1"
+    elif [ -n "$RANGE" ]; then git diff -U0 --no-color "$RANGE" -- "$1"
     else git diff --cached -U0 --no-color -- "$1"; fi
 }
 # The pre-change and post-change copies of a file (AL-2).
@@ -95,7 +102,11 @@ if [ -z "$SELF_TEST" ]; then
     while IFS= read -r path; do
         [ -n "$path" ] && STAGED+=("$path")
     done < <(diff_names AM)
-    [ "${#STAGED[@]}" -eq 0 ] && exit 0
+    # Nothing added or changed at the end: done, unless the range holds a
+    # commit, whose own added lines AL-6's commit pass still reads.
+    if [ "${#STAGED[@]}" -eq 0 ]; then
+        [ -n "$RANGE" ] && [ -n "$(git rev-list --no-merges -n 1 "$RANGE")" ] || exit 0
+    fi
 fi
 
 FAIL=0
@@ -279,6 +290,137 @@ AL6_MDREF_EXEMPT='resecta-[a-z-]+/|appendingPathComponent\('
 AL6_PROCESS_RE='\b(?:ruling|ruled|rules of record|adjudicat\w*|reserved to|ratified|approved by|hand-review\w*|re-review\w*)\b|-approved\b'
 AL6_STEP_RE='(?<![\w-])(?!C(?:89|90|99|11|17|23)\b)(?:W[1-9][0-9]?|S[1-9][0-9]?|B0[1-9]|T[1-9][0-9]?|C[1-9][0-9]?)(?![\w-])'
 AL6_NAME_RE='\bJesse\b'
+# Three shapes of the session planning, and the files AL-6 reads:
+# (package key) a work package's or a decision's key: U-, a capital,
+#   digits and an optional letter; G-, H-, J-, K-, L-, M- or N- and two
+#   digits, an optional small letter and an optional digit; C- and three
+#   digits and an optional small letter. `UTF-8`, `SE-0466`, `U-235`,
+#   `SHA-256`, `P-256`, `M-1`, a plate such as `IA-4`, a known-issue id
+#   (`KI-26`) and a table's row ids (`T-12`, `PS-1`, `R-20`) have none of
+#   these shapes.
+# (working name) a planning working name, lane-<up to four letters><up to
+#   two digits> or leader-<digits>, alone or as a path segment; a word
+#   that runs on (`plane-`, `swim-lane-`, or lane, a hyphen and a longer
+#   word) passes.
+# (planning word) the planning papers' `orders UPDATE` and `revision N`,
+#   in the text resources only: in code, PDF and Vision name their own
+#   revisions (a two-revision document, a request's revision).
+# The files (al6_kind): .swift and .xcstrings anywhere, read as code; the
+#   text resources (AL6_RESOURCE_RE) under any Tests/ or Sources/ folder,
+#   read as data. A data file has no comment part, so the three comment
+#   shapes are not read there (a `//` in a URL is no comment); nor is the
+#   section sign, which gazetteers and fixtures quote as content
+#   (`Fla. Stat. § 322.14`); the planning word is. A PDF fixture is its
+#   bytes and is not read, nor is Mutants/ (its patches plant offences on
+#   purpose). A marker on a data line exempts the whole line (a minified
+#   JSON is one line), so each such use is printed as a note.
+# In range mode each commit's message is read too, for the data shapes.
+AL6_KEY_RE='\b(?:U-[A-Z][0-9]+[A-Za-z]?|[GHJKLMN]-[0-9]{2}[a-z]?[0-9]?|C-[0-9]{3}[a-z]?)\b'
+AL6_SEAT_RE='(?<![\w-])(?:lane-[a-z]{1,4}[0-9]{0,2}|leader-[0-9]+)(?![\w-])'
+AL6_DATA_WORD_RE='\borders UPDATE\b|\b[Rr]evision [0-9]+\b'
+AL6_RESOURCE_RE='(^|/)(Tests|Sources)/.*\.(json|txt|md|plist|entitlements|strings|stringsdict|ya?ml|csv|tsv|xml|html)$'
+# Prints `code`, `data` or nothing for a path: how AL-6 reads it.
+al6_kind() {
+    case "$1" in *.swift|*.xcstrings) echo code; return ;; esac
+    if [[ "$1" =~ $AL6_RESOURCE_RE ]]; then echo data; fi
+}
+# One AL-6 offence ($1 message, $2 path, $3 `line: body`, $4 where): reported
+# once per message, path and line body, so a commit's hit on a line the
+# range still holds at its end (reported by the whole diff) is not repeated.
+AL6_SEEN=""
+al6_report() {
+    local key="$1|$2|${3#*: }"
+    if printf '%s\n' "$AL6_SEEN" | /usr/bin/grep -Fxq -- "$key"; then return 0; fi
+    AL6_SEEN="$AL6_SEEN"$'\n'"$key"
+    violate "$1: $2:$3$4"
+}
+# Every AL-6 shape on the added lines of one file ($1 path, $2 its kind from
+# al6_kind, $3 where, appended to each message): from the staged diff, the
+# range's whole diff, or, with AL6_COMMIT set, that commit's own diff.
+al6_file() {
+    local path="$1" kind="$2" at="$3" off
+    while IFS= read -r off; do
+        [ -n "$off" ] && al6_report "AL-6 planning shorthand" "$path" "$off" "$at"
+    done < <(CASE_SENSITIVE=1 scan_added "$path" "$AL6_RE" "Shorthand:ok")
+    if [ "$kind" = code ]; then
+        while IFS= read -r off; do
+            [ -n "$off" ] && al6_report "AL-6 planning shorthand (section reference)" "$path" "$off" "$at"
+        done < <(CASE_SENSITIVE=1 EXEMPT="$AL6_SECTION_EXEMPT" scan_added "$path" "$AL6_SECTION_RE" "Shorthand:ok")
+    fi
+    while IFS= read -r off; do
+        [ -n "$off" ] && al6_report "AL-6 planning shorthand (markdown name)" "$path" "$off" "$at"
+    done < <(CASE_SENSITIVE=1 EXEMPT="$AL6_MDREF_EXEMPT" scan_added "$path" "$AL6_MDREF_RE" "Shorthand:ok")
+    while IFS= read -r off; do
+        [ -n "$off" ] && al6_report "AL-6 planning shorthand (package key)" "$path" "$off" "$at"
+    done < <(CASE_SENSITIVE=1 scan_added "$path" "$AL6_KEY_RE" "Shorthand:ok")
+    while IFS= read -r off; do
+        [ -n "$off" ] && al6_report "AL-6 planning shorthand (working name)" "$path" "$off" "$at"
+    done < <(CASE_SENSITIVE=1 scan_added "$path" "$AL6_SEAT_RE" "Shorthand:ok")
+    if [ "$kind" = data ]; then
+        while IFS= read -r off; do
+            [ -n "$off" ] && al6_report "AL-6 planning shorthand (planning word)" "$path" "$off" "$at"
+        done < <(CASE_SENSITIVE=1 scan_added "$path" "$AL6_DATA_WORD_RE" "Shorthand:ok")
+        while IFS= read -r off; do
+            [ -n "$off" ] && printf 'AL-6 note: Shorthand:ok exempts this whole data line: %s:%s%s\n' "$path" "$off" "$at" >&2
+        done < <(CASE_SENSITIVE=1 scan_added "$path" 'Shorthand:ok' "")
+        return 0
+    fi
+    while IFS= read -r off; do
+        [ -n "$off" ] && al6_report "AL-6 planning shorthand (process word)" "$path" "$off" "$at"
+    done < <(COMMENT_ONLY=1 scan_added "$path" "$AL6_PROCESS_RE" "Shorthand:ok")
+    while IFS= read -r off; do
+        [ -n "$off" ] && al6_report "AL-6 planning shorthand (step token)" "$path" "$off" "$at"
+    done < <(CASE_SENSITIVE=1 COMMENT_ONLY=1 scan_added "$path" "$AL6_STEP_RE" "Shorthand:ok")
+    while IFS= read -r off; do
+        [ -n "$off" ] && al6_report "AL-6 planning shorthand (author name)" "$path" "$off" "$at"
+    done < <(CASE_SENSITIVE=1 COMMENT_ONLY=1 scan_added "$path" "$AL6_NAME_RE" "Shorthand:ok")
+    return 0
+}
+# AL-6's commit pass over $RANGE: each commit that is not a merge, oldest
+# first, its own added and changed paths and its own added lines (a merge
+# has no diff of its own here; what it settles is in the range's whole
+# diff). A path one commit adds and a later commit deletes is read too.
+al6_range_commits() {
+    local c path kind
+    for c in $(git rev-list --no-merges --reverse "$RANGE"); do
+        while IFS= read -r path; do
+            kind=$(al6_kind "$path")
+            [ -n "$kind" ] || continue
+            AL6_COMMIT="$c"
+            al6_file "$path" "$kind" " (in commit ${c:0:12})"
+            AL6_COMMIT=""
+        done < <(git diff-tree --no-commit-id --name-only -r --diff-filter=AM --root "$c")
+    done
+    return 0
+}
+# AL-6 over the message of each commit of $RANGE, merges included, for the
+# data shapes (register id, Markdown name, package key, working name, planning
+# word); a marker on a message line is printed as a note, as in data.
+al6_range_messages() {
+    local c off where
+    for c in $(git rev-list "$RANGE"); do
+        where="commit message ${c:0:12}"
+        while IFS= read -r off; do
+            [ -n "$off" ] && al6_report "AL-6 planning shorthand" "$where" "$off" ""
+        done < <(git log -1 --format=%B "$c" | PATTERN="$AL6_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL")
+        while IFS= read -r off; do
+            [ -n "$off" ] && al6_report "AL-6 planning shorthand (markdown name)" "$where" "$off" ""
+        done < <(git log -1 --format=%B "$c" | PATTERN="$AL6_MDREF_RE" EXEMPT="$AL6_MDREF_EXEMPT" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL")
+        while IFS= read -r off; do
+            [ -n "$off" ] && al6_report "AL-6 planning shorthand (package key)" "$where" "$off" ""
+        done < <(git log -1 --format=%B "$c" | PATTERN="$AL6_KEY_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL")
+        while IFS= read -r off; do
+            [ -n "$off" ] && al6_report "AL-6 planning shorthand (working name)" "$where" "$off" ""
+        done < <(git log -1 --format=%B "$c" | PATTERN="$AL6_SEAT_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL")
+        while IFS= read -r off; do
+            [ -n "$off" ] && al6_report "AL-6 planning shorthand (planning word)" "$where" "$off" ""
+        done < <(git log -1 --format=%B "$c" | PATTERN="$AL6_DATA_WORD_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL")
+        while IFS= read -r off; do
+            [ -n "$off" ] && printf 'AL-6 note: Shorthand:ok exempts this whole message line: %s:%s\n' "$where" "$off" >&2
+        done < <(git log -1 --format=%B "$c" | PATTERN='Shorthand:ok' OVERRIDE="" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL")
+    done
+    return 0
+}
 # The tracked Markdown names, as one alternation for the two patterns that
 # read them (built once; the root documents' stems join it for `§` lines).
 al6_tracked_md() { git ls-files -- '*.md' | sed 's#.*/##' | sort -u | sed 's/\./\\./g' | paste -sd '|' -; }
@@ -482,6 +624,132 @@ if [ -n "$SELF_TEST" ]; then
         echo "audit-lint --self-test: AL-6 author-name rule DRIFTED — expected a hit on line 1, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
         exit 1
     fi
+    # AL-6 (package key) against thirteen lines: a key in a comment (1), in
+    # a data file's note (2), in a string (6) and in each further prefix,
+    # G- H- J- L- M- with their tails (8 to 12), are the hits; `UTF-8` (3), a
+    # plate (4), a marked line (5), `U-235` beside `SE-0466` (7) and the
+    # clean ids of line 13 pass.
+    expected=$'1\n2\n6\n8\n9\n10\n11\n12'
+    actual=$(printf '%s\n' \
+        '        // the U-Z9 paper sets the order' \
+        '  "notes": "K-99x moved the cut",' \
+        '        let charset = "UTF-8"' \
+        '      "text": "Reg # IA-4",' \
+        '        // Shorthand:ok C-999 cited on purpose' \
+        '        let why = "as C-999 has it"' \
+        '        // U-235 and SE-0466 are not keys' \
+        '        // the G-99x reading' \
+        '  "why": "as H-98 set it",' \
+        '        let note = "J-97 moved it"' \
+        '        // L-96 and U-Z9Q, kept' \
+        '  "notes": "M-95a2 asked for it",' \
+        '        // SHA-256, P-256, M-1, KI-26, T-12, PS-1 and [R-20] are no keys' \
+        | PATTERN="$AL6_KEY_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL" \
+        | cut -d: -f1)
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: AL-6 package-key rule OK (hits on lines 1, 2, 6 and 8 to 12 of 13)"
+    else
+        echo "audit-lint --self-test: AL-6 package-key rule DRIFTED — expected hits on lines 1, 2, 6 and 8 to 12 — got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+        exit 1
+    fi
+    # AL-6 (working name) against seven lines: a name in a note (1), a name
+    # as a path segment (2) and a leader's name in a comment (3) are the
+    # hits; words that run on (4, 5, 6) and a marked line (7) pass. The
+    # lines with lane and a hyphen are joined when the test runs, so this
+    # file holds none of them as written.
+    expected=$'1\n2\n3'
+    al6_lane=lane
+    actual=$(printf '%s\n' \
+        "  \"notes\": \"$al6_lane-q7 read the draft\"," \
+        "  \"why\": \"kept at work/$al6_lane-q7/count/stream.json\"," \
+        '        // leader-9 asked for the split' \
+        '        let name = "plane-geometry"' \
+        "        // the swim-$al6_lane-ab layout" \
+        "        // $al6_lane-keeping is a word for cars" \
+        "  \"notes\": \"$al6_lane-q7 Shorthand:ok cited on purpose\"," \
+        | PATTERN="$AL6_SEAT_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL" \
+        | cut -d: -f1)
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: AL-6 working-name rule OK (hits on lines 1, 2 and 3 of 7)"
+    else
+        echo "audit-lint --self-test: AL-6 working-name rule DRIFTED — expected hits on lines 1, 2 and 3 — got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+        exit 1
+    fi
+    # AL-6 (planning word) against four lines: `revision N` (1) and `orders
+    # UPDATE` (2) are the hits; the same words otherwise (3, 4) pass.
+    expected=$'1\n2'
+    actual=$(printf '%s\n' \
+        '  "notes": "Draft 4 (revision 5 of the paper)",' \
+        '  "why": "orders UPDATE 17 A",' \
+        '  "text": "the update orders",' \
+        '  "rule": "revisions kept"' \
+        | PATTERN="$AL6_DATA_WORD_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL" \
+        | cut -d: -f1)
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: AL-6 planning-word rule OK (hits on lines 1 and 2 of 4)"
+    else
+        echo "audit-lint --self-test: AL-6 planning-word rule DRIFTED — expected hits on lines 1 and 2 — got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+        exit 1
+    fi
+    # AL-6's files (al6_kind) against eight paths: a Swift file and a string
+    # catalogue are code; a test JSON, an engine fixture JSON and a source
+    # text are data; a PDF fixture, a script and a JSON outside Tests/ and
+    # Sources/ are not read.
+    expected='code,code,data,data,data,-,-,-'
+    actual=$(for p in A/B.swift L.xcstrings Tests/ResectaAppTests/Cases/x.json \
+        Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/vectors/v.json \
+        Sources/ResectaApp/Resources/n.txt Tests/ResectaAppTests/Resources/f.pdf \
+        Scripts/x.sh Mutants/x.json; do k=$(al6_kind "$p"); printf '%s\n' "${k:--}"; done | paste -sd, -)
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: AL-6 files OK (Swift and string catalogues as code; test and source resources as data; PDF, script and other JSON not read)"
+    else
+        echo "audit-lint --self-test: AL-6 files DRIFTED — expected $expected, got: $actual" >&2
+        exit 1
+    fi
+    # AL-6's commit pass, in a scratch repository built with plumbing (no
+    # hook runs): a commit adds a working name to a test JSON and the next one
+    # removes it. The range's whole diff is empty; the commit pass reports
+    # the first commit's line once, with its commit.
+    al6_tmp=$(mktemp -d "${TMPDIR:-/tmp}/al6-commits.XXXXXX")
+    actual=$( (
+        cd "$al6_tmp" && git init -q . && mkdir -p Tests/A || exit 1
+        export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+        al6_tc() { printf "$3" > Tests/A/x.json && git add Tests/A/x.json && if [ -n "$1" ]; then git commit-tree "$(git write-tree)" -p "$1" -m "$2"; else git commit-tree "$(git write-tree)" -m "$2"; fi; }
+        c0=$(al6_tc "" base '{\n  "rule": "x"\n}\n') && c1=$(al6_tc "$c0" plant '{\n  "rule": "x",\n  "notes": "leader-9 read it",\n  "why": "as U-Z9 set it",\n  "draft": "revision 7"\n}\n') \
+            && c2=$(al6_tc "$c1" unplant '{\n  "rule": "x"\n}\n') || exit 1
+        [ -z "$(git diff "$c0" "$c2")" ] || { echo "the scratch range is not empty"; exit 1; }
+        RANGE="$c0..$c2"; al6_range_commits 2>&1 | sed "s/${c1:0:12}/C1/"
+    ) )
+    rm -rf "$al6_tmp"
+    expected='AL-6 planning shorthand (package key): Tests/A/x.json:4:   "why": "as U-Z9 set it", (in commit C1)
+AL-6 planning shorthand (working name): Tests/A/x.json:3:   "notes": "leader-9 read it", (in commit C1)
+AL-6 planning shorthand (planning word): Tests/A/x.json:5:   "draft": "revision 7" (in commit C1)'
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: AL-6 commit pass OK (a working name, a package key and a planning word one commit adds and the next removes are each reported once, with its commit)"
+    else
+        echo "audit-lint --self-test: AL-6 commit pass DRIFTED — expected the package-key, working-name and planning-word lines in commit C1, got: $actual" >&2
+        exit 1
+    fi
+    # AL-6's message pass, in a scratch repository: a commit whose message
+    # names a package key is reported on that message line; a marked line
+    # passes and is printed as a note.
+    al6_tmp=$(mktemp -d "${TMPDIR:-/tmp}/al6-messages.XXXXXX")
+    actual=$( (
+        cd "$al6_tmp" && git init -q . || exit 1
+        export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+        tr0=$(git write-tree) && c0=$(git commit-tree "$tr0" -m base) \
+            && c1=$(printf 'Follow the order as U-Z9 set it\n\nShorthand:ok U-Z8 cited on purpose\n' | git commit-tree "$tr0" -p "$c0") || exit 1
+        RANGE="$c0..$c1"; al6_range_messages 2>&1 | sed "s/${c1:0:12}/C1/"
+    ) )
+    rm -rf "$al6_tmp"
+    expected='AL-6 planning shorthand (package key): commit message C1:1: Follow the order as U-Z9 set it
+AL-6 note: Shorthand:ok exempts this whole message line: commit message C1:3: Shorthand:ok U-Z8 cited on purpose'
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: AL-6 message pass OK (a key in a commit message is reported on its line; a marked line is a note)"
+    else
+        echo "audit-lint --self-test: AL-6 message pass DRIFTED — expected one package-key line and one note for commit C1, got: $actual" >&2
+        exit 1
+    fi
     # AL-5's scanner call fails closed: a missing scanner and a crashing
     # one both return 1; a scanner that reports an offence returns 0 with
     # the offence line.
@@ -502,7 +770,7 @@ if [ -n "$SELF_TEST" ]; then
     exit 1
 fi
 
-for path in "${STAGED[@]}"; do
+for path in ${STAGED[@]+"${STAGED[@]}"}; do
     case "$path" in *.swift|*.xcstrings|*.md) ;; *) continue ;; esac
     keyword=""
     case "$path" in *.swift) keyword=1 ;; esac
@@ -513,7 +781,7 @@ done
 
 # ── M-3 banned networking symbols (Sources/ + Packages/RedactionEngine/) ─
 M3_RE='\b(URLSession|URLRequest|NWConnection|NWPathMonitor|WKWebView)\b'
-for path in "${STAGED[@]}"; do
+for path in ${STAGED[@]+"${STAGED[@]}"}; do
     case "$path" in *.swift) ;; *) continue ;; esac
     case "$path" in Sources/*|Packages/RedactionEngine/*) ;; *) continue ;; esac
     while IFS= read -r off; do
@@ -549,7 +817,7 @@ done < <(m3_tree_judge "$m3_tree_hits" "$M3_TREE_PINNED")
 # depth; flags any @AppStorage declaration inside one. Note: synthesized
 # attributes on App/View structs are fine — only @Observable class bodies
 # are banned (that is the M-4 rule).
-for path in "${STAGED[@]}"; do
+for path in ${STAGED[@]+"${STAGED[@]}"}; do
     case "$path" in *.swift) ;; *) continue ;; esac
     [ -f "$path" ] || continue
     while IFS= read -r off; do
@@ -585,7 +853,7 @@ done
 
 # ── M-5 banned APIs (Sources/ + Packages/) ─────────────────────────────
 M5_RE='\b(PKCanvasView)\b|\bPDFPage\.draw\b'
-for path in "${STAGED[@]}"; do
+for path in ${STAGED[@]+"${STAGED[@]}"}; do
     case "$path" in *.swift) ;; *) continue ;; esac
     case "$path" in Sources/*|Packages/*) ;; *) continue ;; esac
     while IFS= read -r off; do
@@ -606,7 +874,7 @@ while IFS= read -r path; do
     [ -n "$path" ] && ADDED+=("$path")
 done < <(diff_names A)
 
-for path in "${STAGED[@]}"; do
+for path in ${STAGED[@]+"${STAGED[@]}"}; do
     [ "$path" = "$HUB" ] || continue
     [ -f "$path" ] || continue
     loc=$(wc -l < "$path" | tr -d ' ')
@@ -631,7 +899,7 @@ done
 # mechanical rules this script enforces above; that page lists them with
 # their override markers and is never referenced here beyond its name).
 PBXPROJ="ResectaApp.xcodeproj/project.pbxproj"
-for path in "${STAGED[@]}"; do
+for path in ${STAGED[@]+"${STAGED[@]}"}; do
     [ "$path" = "project.yml" ] || continue
     if [ -n "$RANGE" ]; then
         echo "AL-1 skipped in range mode: the pbxproj is gitignored and regenerated from project.yml before the lint runs"
@@ -640,7 +908,7 @@ for path in "${STAGED[@]}"; do
     if git ls-files --error-unmatch "$PBXPROJ" >/dev/null 2>&1; then
         # Tracked pbxproj: the regenerated file must land in the same commit.
         pbx_staged=0
-        for staged_path in "${STAGED[@]}"; do
+        for staged_path in ${STAGED[@]+"${STAGED[@]}"}; do
             [ "$staged_path" = "$PBXPROJ" ] && pbx_staged=1
         done
         [ "$pbx_staged" -eq 1 ] \
@@ -688,7 +956,7 @@ resource_entry_known() {
     return 1
 }
 
-for path in "${STAGED[@]}"; do
+for path in ${STAGED[@]+"${STAGED[@]}"}; do
     [ "$path" = "project.yml" ] || continue
     head_resources=$(show_before project.yml | list_app_target_resources || true)
     staged_resources=$(show_after project.yml | list_app_target_resources || true)
@@ -709,7 +977,7 @@ done
 SAMPLE_APP="Resources/SampleDocument.pdf"
 SAMPLE_ENGINE="Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/TestResources/sample-bank-statement.pdf"
 sample_touched=0
-for path in "${STAGED[@]}"; do
+for path in ${STAGED[@]+"${STAGED[@]}"}; do
     case "$path" in "$SAMPLE_APP"|"$SAMPLE_ENGINE") sample_touched=1 ;; esac
 done
 if [ "$sample_touched" -eq 1 ]; then
@@ -736,7 +1004,7 @@ fi
 # skip.
 AL5_SCANNER="$(cd "$(dirname "$0")" && pwd)/lint-silent-guards.py"
 [ -f "$AL5_SCANNER" ] || AL5_SCANNER="$REPO_ROOT/Scripts/lint-silent-guards.py"
-for path in "${STAGED[@]}"; do
+for path in ${STAGED[@]+"${STAGED[@]}"}; do
     case "$path" in *Tests/*.swift) ;; *) continue ;; esac
     [ -f "$path" ] || continue
     added="$(diff_added_hunks "$path" | perl -ne 'if (/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/) { my ($s, $n) = ($1, defined $2 ? $2 : 1); print "$_\n" for ($s .. $s + $n - 1); }')"
@@ -755,41 +1023,31 @@ for path in "${STAGED[@]}"; do
 done
 
 # ── AL-6 planning shorthand on added lines ──────────────────────────────
-# Shipped source, tests and string tables describe mechanisms; they never
-# cite the private planning registers that scheduled the work, and a
-# reader of the repository has no way to resolve such a citation. This
-# check reports, on each added line of a .swift or .xcstrings file, a token
-# in the register-identifier shape (AL6_RE, defined with M-1 above) as an
-# offence, and likewise the five shapes defined beside it: a section sign
-# with no standard or repository document named on the line, a Markdown
-# name the repository does not track, a planning-process word, a step
-# token and the maintainer's first name (the last three in the comment
-# part of the line only). The pre-commit hook blocks the commit and the
+# Shipped source, tests, string tables and the test and source resources
+# describe mechanisms; they never cite the private planning that scheduled
+# the work, and a reader of the repository has no way to resolve such a
+# citation. This check reports, on each added line of a .swift or
+# .xcstrings file and of a text resource under a Tests/ or Sources/ folder
+# (al6_kind, defined with M-1 above), a token in the register-identifier
+# shape (AL6_RE) as an offence, and likewise the shapes defined beside it:
+# a Markdown name the repository does not track, a package key and a
+# working name; in code, a section sign with no standard or repository document
+# named on the line, and a planning-process word, a step token and the
+# maintainer's first name (in the comment part of the line only); in a
+# resource, a planning word. The pre-commit hook blocks the commit and the
 # pull-request gate fails; each message names the shape. Same-line marker:
-# `Shorthand:ok <reason>`. The mechanical twin of the datapipeline's
+# `Shorthand:ok <reason>`. In range mode each commit of the range is read
+# on its own as well (al6_range_commits; its messages end `(in commit
+# <id>)`; a merge is read only through the range's whole diff), and so is
+# each commit's message (al6_range_messages). The mechanical twin of the datapipeline's
 # hygiene gate (scripts/hygiene_gate.py there scans the whole tree; this
 # one scans the lines a change adds).
-for path in "${STAGED[@]}"; do
-    case "$path" in *.swift|*.xcstrings) ;; *) continue ;; esac
-    while IFS= read -r off; do
-        [ -n "$off" ] && violate "AL-6 planning shorthand: $path:$off"
-    done < <(CASE_SENSITIVE=1 scan_added "$path" "$AL6_RE" "Shorthand:ok")
-    while IFS= read -r off; do
-        [ -n "$off" ] && violate "AL-6 planning shorthand (section reference): $path:$off"
-    done < <(CASE_SENSITIVE=1 EXEMPT="$AL6_SECTION_EXEMPT" scan_added "$path" "$AL6_SECTION_RE" "Shorthand:ok")
-    while IFS= read -r off; do
-        [ -n "$off" ] && violate "AL-6 planning shorthand (markdown name): $path:$off"
-    done < <(CASE_SENSITIVE=1 EXEMPT="$AL6_MDREF_EXEMPT" scan_added "$path" "$AL6_MDREF_RE" "Shorthand:ok")
-    while IFS= read -r off; do
-        [ -n "$off" ] && violate "AL-6 planning shorthand (process word): $path:$off"
-    done < <(COMMENT_ONLY=1 scan_added "$path" "$AL6_PROCESS_RE" "Shorthand:ok")
-    while IFS= read -r off; do
-        [ -n "$off" ] && violate "AL-6 planning shorthand (step token): $path:$off"
-    done < <(CASE_SENSITIVE=1 COMMENT_ONLY=1 scan_added "$path" "$AL6_STEP_RE" "Shorthand:ok")
-    while IFS= read -r off; do
-        [ -n "$off" ] && violate "AL-6 planning shorthand (author name): $path:$off"
-    done < <(CASE_SENSITIVE=1 COMMENT_ONLY=1 scan_added "$path" "$AL6_NAME_RE" "Shorthand:ok")
+for path in ${STAGED[@]+"${STAGED[@]}"}; do
+    kind=$(al6_kind "$path")
+    [ -n "$kind" ] || continue
+    al6_file "$path" "$kind" ""
 done
+if [ -n "$RANGE" ]; then al6_range_commits; al6_range_messages; fi
 
 # ── AL-7 (whole tree): no per-character bounds from PDFPage ─────────────
 # PDFPage.characterBounds(at:) runs one index late for each line break before
