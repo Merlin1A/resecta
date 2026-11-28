@@ -1,0 +1,19 @@
+Property: A start is read from the kept plan only while it is of the page as stored now. Here the kept plan is read at any version.
+Area: the first edit's gesture (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstEditGestureTests -only-testing:ResectaAppTests/FirstEditSamplePageTests
+Must go red: ResectaAppTests/FirstEditGestureTests theReaderReadsOnlyACurrentPlan; ResectaAppTests/FirstEditGestureTests undoBumpsThePageVersion; ResectaAppTests/FirstEditSamplePageTests aHolderGoneBeforeTheDrawingPass
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/FirstEdit.swift b/Sources/ResectaApp/State/FirstEdit.swift
+index 32fed4f94..1f19e7c36 100644
+--- a/Sources/ResectaApp/State/FirstEdit.swift
++++ b/Sources/ResectaApp/State/FirstEdit.swift
+@@ -37,7 +37,7 @@ nonisolated enum FirstEdit {
+     /// page's words, so no start is read from it either.
+     static func currentPlan(kept: DrawnPlan?, pageVersion: Int,
+                             madeAtRead: () -> DrawnPlan?) -> DrawnPlan? {
+-        if let kept, !kept.madeWithoutRead, kept.pageVersion == pageVersion, kept.fromStoredRegions == true {
++        if let kept, !kept.madeWithoutRead {
+             return kept
+         }
+         return madeAtRead()

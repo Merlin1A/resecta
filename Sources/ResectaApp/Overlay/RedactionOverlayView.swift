@@ -128,7 +128,8 @@ class RedactionOverlayView: UIView {
     var dragOffset: CGSize = .zero
     /// Normalized rect captured before a move begins, for cancel restoration.
     var preDragNormalizedRect: CGRect?
-    /// Normalized rect captured when a resize begins: the drag's anchor and the cancel's restore.
+    /// Normalized rect captured when a resize begins: the cancel's restore, and the drag's
+    /// anchor unless the region takes a first-edit start (`firstEditStarts`).
     var preResizeNormalizedRect: CGRect?
     /// Primary touch reference recorded at touchesBegan. Secondary
     /// touches (e.g., a finger landing during a Pencil drag) are ignored
@@ -151,6 +152,16 @@ class RedactionOverlayView: UIView {
     var groupMoveTouchedID: UUID?
     /// The region an Add to Selection touch landed on, toggled on lift.
     var pendingToggleID: UUID?
+    /// Where each box the gesture edits for the first time starts
+    /// (`FirstEdit`), by id, taken once when the drag passes the start slop:
+    /// the start the page's plan gives, or the box's own rectangle when it
+    /// gives none. The gesture anchors on it; the `pre*` rects above stay
+    /// the cancel's restore. A box listed here was anchored to its text when
+    /// the drag began, and its copy is not until the drag ends.
+    var firstEditStarts: [UUID: CGRect] = [:]
+    /// Reads a box's first-edit start. The coordinator sets it to read the
+    /// page's plan; with none set, no box has a start.
+    var startReader: FirstEdit.StartReader = { _ in nil }
 
     // MARK: - Snap State
 

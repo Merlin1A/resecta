@@ -63,8 +63,9 @@ struct OverlayDrawnPlanTests {
             .stamped(pageVersion: 2, fromStoredRegions: true)
         #expect(page.rotation == 90)
         #expect(kept == expected)
+        // The same plan unturned, with the same read: the page's turn is read.
         #expect(kept != DrawnPlan(pageIndex: 0, regions: regions, cropBox: page.bounds(for: .cropBox).size,
-                                  rotation: 0, switchOn: false, exportDPI: 150, fillColor: .white)
+                                  rotation: 0, switchOn: false, exportDPI: 150, fillColor: .white, read: read)
             .stamped(pageVersion: 2, fromStoredRegions: true))
         #expect(kept.boxes.map(\.regionIDs) == regions.map { [$0.id] })
         #expect(kept.exportDPI == 150 && kept.fillColor == .white && kept.switchOn == false)

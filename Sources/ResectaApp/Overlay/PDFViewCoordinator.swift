@@ -321,6 +321,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         overlay.geometry = RunRecord.PageGeometry(page: page, box: view.displayBox)
         overlay.pageSize = page.bounds(for: view.displayBox).size
         overlay.coordinator = self
+        overlay.startReader = firstEditStartReader(pageIndex: pageIndex)
         overlay.isUserInteractionEnabled = isDrawingEnabled
         overlay.isDrawingMode = isDrawingMode
         overlay.activeShapeTool = activeShapeTool
@@ -550,9 +551,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         guard let state = redactionState, let settings = settingsState, let documentState,
               let page = documentState.sourceDocument?.page(at: pageIndex) else { return }
         let cropBox = page.bounds(for: .cropBox).size
-        // Nil where the run refuses the page for its size; no run fills it.
-        let quality = runQuality(chosenDPI: settings.exportDPI, dpiCap: qualityCap, cropBox: cropBox,
-                                 rotation: page.rotation) ?? min(settings.exportDPI, qualityCap)
+        let quality = keptQuality(of: page, settings: settings)
         if isDrawn, state.shownDPIs[pageIndex] != quality { state.shownDPIs[pageIndex] = quality }
         let read = documentState.pageReads[pageIndex]
         let made: DrawnPlan
@@ -570,6 +569,40 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
             .stamped(pageVersion: state.pageVersion(pageIndex),
                      fromStoredRegions: regions == state.regions[pageIndex] ?? [])
         if state.drawnPlans[pageIndex] != drawn { state.drawnPlans[pageIndex] = drawn }
+    }
+
+    /// The quality a page's plan is made at: the quality a run started now
+    /// uses (`runQuality` under `qualityCap`). Where the run refuses the page
+    /// for its size, no run fills it, and the chosen quality under the cap.
+    private func keptQuality(of page: PDFPage, settings: SettingsState) -> Int {
+        runQuality(chosenDPI: settings.exportDPI, dpiCap: qualityCap, cropBox: page.bounds(for: .cropBox).size,
+                   rotation: page.rotation) ?? min(settings.exportDPI, qualityCap)
+    }
+
+    /// The reader of first-edit starts for `pageIndex`'s overlay: from the
+    /// page's kept plan while it is of the page as stored now, else from the
+    /// page's plan made at the read (`planAtRead`). It reads at each call.
+    func firstEditStartReader(pageIndex: Int) -> FirstEdit.StartReader {
+        FirstEdit.reading { [weak self] in
+            guard let self, let state = self.redactionState else { return nil }
+            return FirstEdit.currentPlan(kept: state.drawnPlans[pageIndex],
+                                         pageVersion: state.pageVersion(pageIndex)) {
+                self.planAtRead(pageIndex: pageIndex)
+            }
+        }
+    }
+
+    /// The page's plan made now from its stored regions, by the same maker
+    /// and with the same settings and quality as a kept plan, and with the
+    /// page's read as the run's entry hands it (`DocumentState.pageReads`),
+    /// so it carries the page's words when they are read. Kept nowhere.
+    func planAtRead(pageIndex: Int) -> DrawnPlan? {
+        guard let state = redactionState, let settings = settingsState, let documentState,
+              let page = documentState.sourceDocument?.page(at: pageIndex) else { return nil }
+        return DrawnPlan(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [],
+                         cropBox: page.bounds(for: .cropBox).size, rotation: page.rotation,
+                         switchOn: settings.boxesAcrossColumn, exportDPI: keptQuality(of: page, settings: settings),
+                         fillColor: settings.fillColor, read: documentState.pageReads[pageIndex])
     }
 
     /// Reads one page for its kept plan, once at a time, and redraws the page

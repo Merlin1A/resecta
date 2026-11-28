@@ -1,0 +1,26 @@
+Property: Any cancel of a first edit, the app going to the background among them, anchors the box again. Here only a cancelled touch does.
+Area: the first edit's gesture (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstEditGestureTests
+Must go red: ResectaAppTests/FirstEditGestureTests backgroundAfterTheSlopRestores
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
+index d4518a50c..7c192449a 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
+@@ -290,6 +290,7 @@ extension RedactionOverlayView {
+         // Only the primary touch's cancel discards the gesture;
+         // a system cancel of the primary still cancels.
+         guard let primaryTouch, touches.contains(primaryTouch) else { return }
++        for i in regions.indices where firstEditStarts[regions[i].id] != nil { regions[i].textAnchored = true }
+         cancelHeldGesture()
+     }
+ 
+@@ -324,7 +325,6 @@ extension RedactionOverlayView {
+         // never the start.
+         for i in regions.indices {
+             if let before = preGestureDrawnPageRects[regions[i].id] { regions[i].drawnPageRect = before }
+-            if firstEditStarts[regions[i].id] != nil { regions[i].textAnchored = true }
+         }
+         resetDragState()
+         setNeedsDisplay()

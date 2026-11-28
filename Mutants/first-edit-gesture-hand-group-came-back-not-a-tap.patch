@@ -1,0 +1,19 @@
+Property: A group of boxes drawn by hand, dragged past the start slop and back, is a tap on the touched box, as before. Here it is kept as a drag that came back.
+Area: the first edit's gesture (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstEditGestureTests
+Must go red: ResectaAppTests/FirstEditGestureTests handGroupBackIsATap
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
+index c221528aa..9448c4e75 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
+@@ -112,7 +112,7 @@ extension RedactionOverlayView {
+     /// step.
+     func endGroupMove() {
+         let members = regions.filter { selectedIDs.contains($0.id) }
+-        if !firstEditStarts.isEmpty {
++        if hasPassedStartSlop {
+             if cameBackToTheStart(members, before: preDragGroupRects) {
+                 restoreFirstEditCopies(preDragGroupRects)
+                 return
