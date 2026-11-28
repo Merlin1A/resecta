@@ -67,6 +67,63 @@ nonisolated final class SeededStatesUITests: XCTestCase {
         XCTAssertFalse(previewRow.exists, "The Preview row shows with no output.")
     }
 
+    func testBurnedBoxesShowTheirLine() {
+        launchResults(["--seedBurnedBoxes=19"])
+        let line = text(beginningWith: "19 boxes can still show")
+        XCTAssertTrue(line.waitForExistence(timeout: 10), "The boxes line never appeared.")
+        XCTAssertEqual(line.label, "19 boxes can still show how long their text is.")
+    }
+
+    func testOutputSizeShowsWithTheOutput() {
+        launchResults(["--seedOutput", "--seedOutputBytes=38200000"])
+        let line = text(beginningWith: "This PDF is ")
+        XCTAssertTrue(line.waitForExistence(timeout: 10), "The size line never appeared.")
+        XCTAssertEqual(line.label, "This PDF is 38.2 MB.")
+    }
+
+    func testOutputSizeIsGoneWithTheOutput() {
+        launchResults(["--seedOutputBytes=38200000"])
+        XCTAssertTrue(shareCard.waitForExistence(timeout: 10), "Share card not found.")
+        XCTAssertFalse(text(beginningWith: "This PDF is ").exists, "The size line shows with no output.")
+    }
+
+    func testLongImageOnlyShowsItsLine() {
+        launchResults(["--seedOutput", "--seedSecurePages=140"])
+        let line = text(beginningWith: "This PDF has 140 pages and no text")
+        XCTAssertTrue(line.waitForExistence(timeout: 10), "The long image-only line never appeared.")
+        XCTAssertEqual(line.label, Self.longImageOnly)
+    }
+
+    func testLongImageOnlyIsGoneAtEightyPages() {
+        launchResults(["--seedOutput", "--seedSecurePages=80"])
+        XCTAssertTrue(shareCard.waitForExistence(timeout: 10), "Share card not found.")
+        XCTAssertFalse(text(beginningWith: "This PDF has ").exists, "The long image-only line shows at 80 pages.")
+    }
+
+    func testUnreadPagesShowTheirLines() {
+        launchResults(["--seedSecurePages=48", "--seedUnread=12/38"])
+        let named = text(beginningWith: "Before Redact, ")
+        XCTAssertTrue(named.waitForExistence(timeout: 10), "The not-searched line never appeared.")
+        XCTAssertEqual(named.label, "Before Redact, 12 pages were not searched in full.")
+        XCTAssertEqual(text(beginningWith: "Small pictures on ").label,
+                       "Small pictures on 38 pages, such as logos and stamps, were not searched. A name inside a logo or stamp is not found.")
+        XCTAssertEqual(text(beginningWith: "The checks then ran on ").label,
+                       "The checks then ran on all 48 pages, looking for your boxed text.")
+    }
+
+    func testScopeNoteShowsWithTheOutput() {
+        launchResults(["--seedOutput"])
+        let note = element("checksPassedScope")
+        XCTAssertTrue(note.waitForExistence(timeout: 10), "The note beside Checks Passed never appeared.")
+        XCTAssertEqual(note.label, Self.checksPassedScope)
+    }
+
+    func testScopeNoteIsGoneWithTheOutput() {
+        launchResults([])
+        XCTAssertTrue(shareCard.waitForExistence(timeout: 10), "Share card not found.")
+        XCTAssertFalse(element("checksPassedScope").exists, "The note beside Checks Passed shows with no output.")
+    }
+
     func testVerifyingStopsOnTheProgressScreen() {
         app.launchArguments = ["--uitesting", Self.report, "--seedVerifying=2"]
         app.launch()
@@ -87,6 +144,11 @@ nonisolated final class SeededStatesUITests: XCTestCase {
         XCTAssertTrue(shareCard.waitForExistence(timeout: 10), "Share card not found.")
         XCTAssertTrue(shareCard.isEnabled, "Share is disabled with no seed.")
         XCTAssertFalse(element("shareDisabledReason").exists, "A disabled-Share reason shows with no seed.")
+        for start in ["boxes can still show how long their text is.", "box can still show how long its text is.",
+                      "This PDF is ", "This PDF has ",
+                      "Before Redact, ", "Small pictures on ", "The checks then ran on "] {
+            XCTAssertFalse(text(containing: start).exists, "A run line with \"\(start)\" shows with no seed.")
+        }
     }
 
     /// A seed without a report seeds nothing: the editor, not the results.
@@ -126,6 +188,21 @@ nonisolated final class SeededStatesUITests: XCTestCase {
 
     private func element(_ identifier: String) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    /// The line beside Checks Passed, as the results screen shows it.
+    private static let checksPassedScope =
+        "Checks Passed means no check reported your boxed text in this PDF. In this version the checks do not show that they read every part of the file. What remains can still identify someone."
+
+    private static let longImageOnly =
+        "This PDF has 140 pages and no text, so an AI assistant that reads only the text of a PDF this long will read nothing of it."
+
+    private func text(beginningWith start: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", start)).firstMatch
+    }
+
+    private func text(containing part: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", part)).firstMatch
     }
 
     private var shareCard: XCUIElement {

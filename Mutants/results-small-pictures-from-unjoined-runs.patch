@@ -1,0 +1,21 @@
+Property: The small-picture pages are read from each unit's runs joined, so a page a later run read in full is not among them.
+Area: the results screen's small-picture count
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ResultsRunLinesTests
+Must go red: ResectaAppTests/ResultsRunLinesTests smallPicturePages
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/ResultsRunLines.swift b/Sources/ResectaApp/Views/ResultsRunLines.swift
+--- a/Sources/ResectaApp/Views/ResultsRunLines.swift
++++ b/Sources/ResectaApp/Views/ResultsRunLines.swift
+@@ -20,10 +20,7 @@ extension RedactStop {
+     /// not among them. A page can also be one the stop names for another unit.
+     static func smallPicturePages(runs: [Run]) -> Set<Int> {
+         var pages = Set<Int>()
+-        for unit in units(of: runs) {
+-            guard let account = account(for: unit, in: runs) else { continue }
+-            pages.formUnion(account.quietPages)
+-        }
++        for run in runs { pages.formUnion(run.account.quietPages) }
+         return pages
+     }
+ }

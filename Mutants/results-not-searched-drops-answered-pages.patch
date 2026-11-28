@@ -1,0 +1,18 @@
+Property: The run records every page the stop at Redact named as not searched in full, answered pages too.
+Area: the results screen's unread pages, as the run records them
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ResultsRunLinesTests
+Must go red: ResectaAppTests/ResultsRunLinesTests finishedRunRecordsTheFacts
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
+--- a/Sources/ResectaApp/State/PipelineRunner.swift
++++ b/Sources/ResectaApp/State/PipelineRunner.swift
+@@ -387,7 +387,7 @@ struct PipelineRunner {
+             appliedSearches: appliedSearches,
+             burnedRegionVersion: burnedRegionVersion, captureRuns: captureRuns,
+             confirmed: confirmed, unconfirmedBoxPage: unconfirmedBoxPage,
+-            pagesNotSearchedInFull: RedactStop.pagesNotSearchedInFull(runs: closedRuns),
++            pagesNotSearchedInFull: Set(RedactStop.namedPages(runs: closedRuns, answered: redactionState.redactStopAnswered).map(\.page)),
+             smallPicturePages: RedactStop.smallPicturePages(runs: closedRuns))
+     }
+ 
