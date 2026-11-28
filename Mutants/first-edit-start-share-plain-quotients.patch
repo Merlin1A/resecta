@@ -1,0 +1,18 @@
+Property: A start's share reads back to its sixty-fourths exactly. Here it is the plain quotients k/S, which do not always read back.
+Area: the first edit's start (engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'FirstEditStartTests'
+Must go red: RedactionEngineTests/FirstEditStartTests roundTripOnLetterAndA4; RedactionEngineTests/FirstEditStartTests roundTripOnOtherSides
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
+index 1bb9af39c..b0a304af0 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
+@@ -97,6 +97,7 @@ package enum FirstEditStartRule {
+     /// moves it.
+     package static func share(minEdge k0: Int, maxEdge k1: Int, side: Int) -> (origin: Double, length: Double) {
+         let s = Double(side), lo = Double(k0), hi = Double(k1)
++        return (lo / s, hi / s - lo / s)
+         var x = lo / s
+         if Int((x * s).rounded(.down)) != k0 { x = x.nextUp }
+         var m = hi / s

@@ -49,6 +49,20 @@ public struct DrawnPlan: Equatable, Sendable {
     /// changed.
     public private(set) var pageVersion: Int?
     public private(set) var fromStoredRegions: Bool?
+    /// Whether the plan was made with the page's words (its read). A plan
+    /// made without them has no first-edit start: with no letters a region's
+    /// tight rectangle is its own, so the level test would read the wrong
+    /// rectangles.
+    package let wordsGiven: Bool
+    /// Each region's first-edit start, by region id.
+    let starts: [UUID: FirstEditStart]
+
+    /// The first edit's start for a region of this plan: nil for a region
+    /// drawn or edited by hand, for a region the plan does not hold, and for
+    /// every region of a plan made without the page's words.
+    public func firstEditStart(for regionID: UUID) -> FirstEditStart? {
+        wordsGiven ? starts[regionID] : nil
+    }
 
     /// This plan as kept at a page version, from the stored regions or not.
     public func stamped(pageVersion: Int, fromStoredRegions: Bool) -> DrawnPlan {
@@ -79,6 +93,19 @@ public struct DrawnPlan: Equatable, Sendable {
         public let fill: [CGRect]
     }
 
+    /// Where a person's first move or resize of a region placed for them
+    /// starts, worked out when the plan is made.
+    public struct FirstEditStart: Equatable, Sendable {
+        /// The start as a share of the page (0 to 1, origin bottom-left) in
+        /// the frame its regions are drawn in, cut to the page. It reads back
+        /// to the start's whole sixty-fourths exactly.
+        public let share: CGRect
+        /// Which clause of the start rule decided it: 1 alone, 2 exactly held
+        /// by another region of its box, 3 one line with its regions level,
+        /// 4 otherwise.
+        public let clause: Int
+    }
+
     /// The page's plan from `regions` as drawn, the page's crop box and
     /// rotation, the page's read, and the settings it is drawn under. The
     /// read is the one the run's entry hands the same maker
@@ -93,14 +120,29 @@ public struct DrawnPlan: Equatable, Sendable {
     /// takes one: the editor passes the run's own; a test can name another.
     package init(pageIndex: Int, regions: [RedactionRegion], cropBox: CGSize, rotation: Int,
                  switchOn: Bool, exportDPI: Int, fillColor: FillColor, read: RunRecord.PageRead?, source: PlanSource) {
-        let plan = RunRecord.Page.makePlan(regions: regions.map(RunRecord.DrawnRegion.init(region:)),
-                                           cropBox: cropBox, rotation: rotation, switchOn: switchOn, read: read,
-                                           source: source)
+        let made = RunRecord.Page.makePlanAndInputs(regions: regions.map(RunRecord.DrawnRegion.init(region:)),
+                                                    cropBox: cropBox, rotation: rotation, switchOn: switchOn,
+                                                    read: read, source: source)
+        let plan = made?.plan
         self.init(pageIndex: pageIndex, switchOn: switchOn, exportDPI: exportDPI, fillColor: fillColor, plan: plan,
                   filledPixels: Self.filledPixels(regions: regions, cropBox: cropBox, rotation: rotation,
                                                   dpi: exportDPI),
                   boxFills: plan.map { Self.boxFills(plan: $0, regions: regions, cropBox: cropBox,
-                                                     rotation: rotation, dpi: exportDPI) } ?? [])
+                                                     rotation: rotation, dpi: exportDPI) } ?? [],
+                  starts: made?.starts ?? [:], wordsGiven: read != nil)
+    }
+
+    /// A start as the plan holds it, as a share that reads back to its whole
+    /// sixty-fourths exactly through `PageRect64(share:)`: each axis by the
+    /// round trip of `FirstEditStartRule.share(minEdge:maxEdge:side:)`. The
+    /// boxes' own shares stay plain quotients: nothing reads them back.
+    static func firstEditStart(_ start: PlannedStart, plan: PaintPlan) -> FirstEditStart {
+        let x = FirstEditStartRule.share(minEdge: start.rect.minX, maxEdge: start.rect.maxX,
+                                         side: plan.widthSixtyFourths)
+        let y = FirstEditStartRule.share(minEdge: start.rect.minY, maxEdge: start.rect.maxY,
+                                         side: plan.heightSixtyFourths)
+        return FirstEditStart(share: CGRect(x: x.origin, y: y.origin, width: x.length, height: y.length),
+                              clause: start.clause)
     }
 
     /// Each box's fill as a run with a record paints it: the page's pixels
@@ -146,14 +188,17 @@ public struct DrawnPlan: Equatable, Sendable {
     }
 
     package init(pageIndex: Int, switchOn: Bool, exportDPI: Int, fillColor: FillColor, plan: PaintPlan?,
-                 filledPixels: [UUID: CGRect] = [:], boxFills: [[CGRect]] = []) {
+                 filledPixels: [UUID: CGRect] = [:], boxFills: [[CGRect]] = [],
+                 starts: [UUID: PlannedStart] = [:], wordsGiven: Bool = false) {
         self.pageIndex = pageIndex
         self.switchOn = switchOn
         self.exportDPI = exportDPI
         self.fillColor = fillColor
         self.plan = plan
         self.filledPixels = filledPixels
-        guard let plan else { boxes = []; return }
+        self.wordsGiven = wordsGiven
+        guard let plan else { boxes = []; self.starts = [:]; return }
+        self.starts = starts.mapValues { Self.firstEditStart($0, plan: plan) }
         let w = Double(plan.widthSixtyFourths), h = Double(plan.heightSixtyFourths)
         func share(_ r: PageRect64) -> CGRect {
             CGRect(x: Double(r.minX) / w, y: Double(r.minY) / h,
