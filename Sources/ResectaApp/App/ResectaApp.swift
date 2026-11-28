@@ -290,7 +290,7 @@ struct ResectaApp: App {
         .redactionError(.pageTooLarge(pageIndex: 0)),
         .redactionError(.pageSidesNotAsRecorded(pageIndex: 0)),
         .redactionError(.reconstructionFailed),
-        .verificationError(.engineCrash(layerIndex: 0)),
+        .verificationError(.engineCrash(check: nil)),
     ] + PipelineError.ExportFailure.allCases.map(PipelineError.exportError)
 
     /// A failure's name as `--seedFailure` spells it, `<family>.<case>`.

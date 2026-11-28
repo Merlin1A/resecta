@@ -379,7 +379,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             if stage == .verification {
                 return .failed(
                     error as? PipelineError
-                        ?? .verificationError(.engineCrash(layerIndex: 0)),
+                        ?? .verificationError(.engineCrash(check: nil)),
                     returnPhase: .verified(report: .skipped(reason: .error)),
                     clearOutput: false)
             }
@@ -393,7 +393,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             // state (matching the full run).
             return .failed(
                 error as? PipelineError
-                    ?? .verificationError(.engineCrash(layerIndex: 0)),
+                    ?? .verificationError(.engineCrash(check: nil)),
                 returnPhase: .verified(report: .skipped(reason: .error)),
                 clearOutput: false)
         }

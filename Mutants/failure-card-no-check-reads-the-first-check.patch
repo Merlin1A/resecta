@@ -1,0 +1,19 @@
+Property: A verification error that names no check (no pages, an output that does not load, an error from elsewhere) reads the line naming no check, never the schedule's first check.
+Area: the failure card
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -parallel-testing-enabled NO -only-testing:ResectaAppTests/ErrorRecoveryTests
+Must go red: ResectaAppTests/ErrorRecoveryTests failureCardNamesNoCheck
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Extensions/AppError+Display.swift b/Sources/ResectaApp/Extensions/AppError+Display.swift
+index d0f28962..bffd41b9 100644
+--- a/Sources/ResectaApp/Extensions/AppError+Display.swift
++++ b/Sources/ResectaApp/Extensions/AppError+Display.swift
+@@ -148,7 +148,7 @@ extension PipelineError {
+             }
+ 
+         case .verificationError(.engineCrash(let check)):
+-            if let check {
++            if let check = check ?? VerificationEngine().layers(for: .secureRasterization).first {
+                 "\(VerificationRowModel.title(for: check)) could not finish, so this PDF has no verification result. Run Verification again, or share it without verification."
+             } else {
+                 "Verification could not finish, so this PDF has no verification result. Run Verification again, or share it without verification."

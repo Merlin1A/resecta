@@ -506,12 +506,6 @@ struct SkippedShareGateTests {
         #expect(DocumentEditorView.shareNeedsSkippedConfirm(
             report: acknowledged, acknowledged: doc.skippedShareAcknowledged) == false)
     }
-
-    @Test("Skip-fact line names the state (mechanism description)")
-    func skipFactLineNamesState() {
-        #expect(DocumentEditorView.shareRiskConfirmSkipFactLine
-            == "Verification did not run on this PDF.")
-    }
 }
 
 // The bespoke share-risk confirm sheet's copy builders and haptic

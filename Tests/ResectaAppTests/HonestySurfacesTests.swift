@@ -333,7 +333,7 @@ struct FailedStatePrimaryActionTests {
             .importError(.passwordProtected),
             .detectionError(.ocrUnavailable),
             .redactionError(.reconstructionFailed),
-            .verificationError(.engineCrash(layerIndex: 0)),
+            .verificationError(.engineCrash(check: nil)),
             .exportError(.diskFull),
             .exportError(.writeFailed),
             .exportError(.filePurged),

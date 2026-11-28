@@ -20,8 +20,8 @@ struct UnfinishedRunTests {
     }
 
     static let cases: [Case] = [
-        Case(name: "an output with no pages ends the run with an error, never a report", body: { try await noPageOutputThrows() }),
-        Case(name: "a scheduled check that stored no result ends the run, and the report is built in two places only",
+        Case(name: "an output with no pages ends the run with an error naming no check, never a report", body: { try await noPageOutputThrows() }),
+        Case(name: "a scheduled check that stored no result ends the run naming that check, and the report is built in two places only",
              body: { try await missingResultThrows() }),
         Case(name: "an empty list of checks reads skipped, not passed", body: { try await emptyListIsSkipped() }),
         Case(name: "a cancelled shared pass throws instead of reading as nothing requested", body: { try await cancelledPassThrows() }),
@@ -52,9 +52,11 @@ struct UnfinishedRunTests {
         #expect(VerificationEngine().aggregateStatus(report) != .pass, "\(row.status)")
     }
 
-    static func isVerificationError(_ error: any Error, layerIndex expected: Int? = nil) -> Bool {
-        guard case PipelineError.verificationError(.engineCrash(let index)) = error else { return false }
-        return expected.map { $0 == index } ?? true
+    /// The run ended with the verification error, naming exactly `expected`
+    /// as the check that did not finish (nil: the failure is no check's).
+    static func isVerificationError(_ error: any Error, naming expected: VerificationLayer?) -> Bool {
+        guard case PipelineError.verificationError(.engineCrash(let check)) = error else { return false }
+        return check == expected
     }
 
     static func output(_ pages: [String]) throws -> SendablePDFDocument {
@@ -124,7 +126,7 @@ struct UnfinishedRunTests {
                 events: { _ in })
             Issue.record("an output with no pages gave a report: \(report.overallStatus)")
         } catch {
-            #expect(isVerificationError(error), "threw \(error)")
+            #expect(isVerificationError(error, naming: nil), "threw \(error)")
         }
     }
 
@@ -137,7 +139,7 @@ struct UnfinishedRunTests {
                 durationSeconds: 0, perPageModes: [.secureRasterization], perPageFallbackReasons: [nil])
             Issue.record("a short list of results gave a report of \(report.layers.count) rows")
         } catch {
-            #expect(isVerificationError(error, layerIndex: 1), "threw \(error)")
+            #expect(isVerificationError(error, naming: .ocrCheck), "threw \(error)")
         }
         // The pin: the orchestrator's file builds a report in exactly two
         // places (the page-count gate and the assembly) and never folds the
