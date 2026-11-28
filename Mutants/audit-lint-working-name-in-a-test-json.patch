@@ -1,0 +1,17 @@
+Property: A working name on an added line of a test JSON fails the lint (AL-6, working name).
+Area: the pre-commit lint (Scripts/audit-lint.sh)
+Test command: git apply --index Mutants/audit-lint-working-name-in-a-test-json.patch && Scripts/audit-lint.sh
+Must go red: Scripts/audit-lint.sh, the line "AL-6 planning shorthand (working name): Tests/ResectaAppTests/Cases/box-walk-order.json:3"
+Apply in a scratch worktree with `git apply --index` (the lint reads the staged lines); discard after.
+
+diff --git a/Tests/ResectaAppTests/Cases/box-walk-order.json b/Tests/ResectaAppTests/Cases/box-walk-order.json
+index 41f93c517..48ac86f15 100644
+--- a/Tests/ResectaAppTests/Cases/box-walk-order.json
++++ b/Tests/ResectaAppTests/Cases/box-walk-order.json
+@@ -1,5 +1,6 @@
+ {
+   "rule": "box-walk-order",
++  "notes": "leader-9 read the order",
+   "units": "each region's stored rectangle, top-left origin, in page points (any one unit per page gives the same order); created: the region's place in its page's stored array; indexes into the walk's order",
+   "cases": [
+     {
