@@ -5,11 +5,11 @@ Must go red: RedactionEngineTests/PlanPaintTests boxesComeFromThePageData
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-index 8dddf23..5c34eb1 100644
+index 68d303cf8..fb80a4248 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-@@ -336,7 +336,11 @@ extension PageRasterizer {
-             }
+@@ -444,7 +444,11 @@ extension PageRasterizer {
+             if let today = try todayRect(box, grows: grows) { rect = rect.union(today) }
              return rect
          }
 -        for (index, box) in boxes.enumerated() {

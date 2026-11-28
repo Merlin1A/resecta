@@ -350,6 +350,37 @@ struct PlanSwitchTests {
         #expect(held.bitmap.misses(a, level: 0) == 0, "the pixels \"as placed\" fills are filled with the limit too")
     }
 
+    /// One Search region at 36-58 pt from 20 pt to 30.470703125 pt, a top
+    /// that is no whole sixty-fourth: its own "as placed" box rounds it up to
+    /// 1951/64 pt, 127.02 px at 300 dpi, so today's paint reaches row 129
+    /// (that edge, plus one) while the region's fill stops at 128. Its box
+    /// holds that rectangle and is held above at its own top, 1951/64 pt:
+    /// the margin is held at row 127 and the block line is 128, so the box
+    /// alone paints to 128 and leaves row 128, which today paints. A bar
+    /// 0.18 pt tall lies in that row, touching neither 127 nor 129, so no
+    /// growth reaches it; ink inside the box below.
+    static let roundedTop: CGFloat = 1950.125 / 64
+    static let barInTheRow = [CGRect(x: 40, y: 22, width: 14, height: 6), CGRect(x: 44, y: 30.75, width: 4, height: 0.18)]
+
+    @Test("A box held at a top today's paint rounds up past a pixel line still paints every pixel today paints, judged or not",
+          arguments: [true, false])
+    func limitedSideKeepsTodaysPaintedRow(judged: Bool) async throws {
+        let region = CGRect(x: 36, y: 20, width: 22, height: Self.roundedTop - 20)
+        let held64: CGFloat = 1951 / 64
+        let box: Box = (CGRect(x: 36, y: 20, width: 22, height: held64 - 20), [region], true)
+        let held = try await Self.run(source: .switchPolicy, inputsFor: judged ? [0] : [], bars: Self.barInTheRow,
+                                      boxes: [box], limitAbove: held64)
+        let placed = try await Self.run(source: .asPlaced, inputsFor: [], bars: Self.barInTheRow, boxes: [box])
+        #expect((held.result.inkVerdicts[0] != .indeterminate) == judged, "\(held.result.inkVerdicts)")
+        let a = try placed.reported(0)
+        #expect(a.maxY == 129, "today's paint reaches row 129: \(a)")
+        // The box alone, held at its top, stops a row short of today's paint.
+        #expect((try held.projection(0)).maxY == 128, "precondition: the held box alone paints to 128")
+        #expect(held.bitmap.misses(a, level: 0) == 0, "the pixels today fills are filled with the limit too")
+        #expect(held.bitmap.misses(PixelPlan.PixelRect(minX: 183, minY: 128, maxX: 200, maxY: 129), level: 0) == 0,
+                "the bar in row 128 is covered")
+    }
+
     @Test("A judged box keeps today's growth in its floor until the differential count passes")
     func judgedBoxKeepsGrowthForNow() {
         #expect(PageRasterizer.judgedBoxKeepsGrowth)

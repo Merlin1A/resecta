@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/PlanSwitchTests judgedBoxKeepsTheAsPlacedPaint
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-index 212ae6653..120fbb9d2 100644
+index 68d303cf8..355de12ac 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-@@ -439,9 +439,7 @@ extension PageRasterizer {
+@@ -467,9 +467,7 @@ extension PageRasterizer {
                              var rect = withRegionFills(projection.painted.bitmapRect, of: box)
                              // Its floor: "as placed", with what was shown. A box that does not
                              // project as placed still holds what was shown for it.
