@@ -5,15 +5,15 @@ Must go red: ResectaAppTests/OverlayDrawnPlanTests keptPlanReadsTheCap
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
-index 43f86b14..7477b46b 100644
+index 66c1886c7..82682e745 100644
 --- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
 +++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
-@@ -376,7 +376,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
-               let page = documentState?.sourceDocument?.page(at: pageIndex) else { return }
-         let cropBox = page.bounds(for: .cropBox).size
-         // Nil where the run refuses the page for its size; no run fills it.
--        let quality = runQuality(chosenDPI: settings.exportDPI, dpiCap: qualityCap, cropBox: cropBox,
-+        let quality = runQuality(chosenDPI: settings.exportDPI, dpiCap: defaultDPICap, cropBox: cropBox,
-                                  rotation: page.rotation) ?? min(settings.exportDPI, qualityCap)
-         let drawn = DrawnPlan(pageIndex: pageIndex, regions: regions, cropBox: cropBox,
-                               rotation: page.rotation, switchOn: false,
+@@ -558,7 +558,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+     /// uses (`runQuality` under `qualityCap`). Where the run refuses the page
+     /// for its size, no run fills it, and the chosen quality under the cap.
+     private func keptQuality(of page: PDFPage, settings: SettingsState) -> Int {
+-        runQuality(chosenDPI: settings.exportDPI, dpiCap: qualityCap, cropBox: page.bounds(for: .cropBox).size,
++        runQuality(chosenDPI: settings.exportDPI, dpiCap: defaultDPICap, cropBox: page.bounds(for: .cropBox).size,
+                    rotation: page.rotation) ?? min(settings.exportDPI, qualityCap)
+     }
+ 

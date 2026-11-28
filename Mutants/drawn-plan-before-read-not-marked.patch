@@ -1,0 +1,18 @@
+Property: The plan a page drawn before its read keeps is marked as made without the read, so no reader takes it as the page's plan made with it.
+Area: the editor's kept plan before the page's read (DrawnPlan.beforeRead)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter DrawnPlanTests
+Must go red: RedactionEngineTests/DrawnPlanTests beforeTheRead
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+index 27a369ae5..a14f45b80 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+@@ -117,7 +117,6 @@ public struct DrawnPlan: Equatable, Sendable {
+         var drawn = DrawnPlan(pageIndex: pageIndex, regions: regions, cropBox: cropBox, rotation: rotation,
+                               switchOn: switchOn, exportDPI: exportDPI, fillColor: fillColor, read: nil,
+                               source: .asPlaced)
+-        drawn.madeWithoutRead = true
+         return drawn
+     }
+ 

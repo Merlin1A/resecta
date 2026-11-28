@@ -43,8 +43,17 @@ extension BoxCheckInput {
             let named = record.produced.regionsPaintedOutsideThePlan[page.pageIndex] ?? []
             let drawn = page.regions.map(\.id).filter { named.contains($0) }
             let rest = named.subtracting(drawn).sorted { $0.uuidString < $1.uuidString }
+            // A box whose default band the producer withdrew is judged by the
+            // line margin the record made with the plan; with none recorded it
+            // is judged by its band, so its report reads smaller.
+            var boxes = plan.boxes
+            for position in record.produced.defaultBandsWithdrawn where position.pageIndex == page.pageIndex {
+                if position.box < boxes.count, let fallback = page.defaultFallbacks[position.box] {
+                    boxes[position.box] = fallback
+                }
+            }
             pages.append(Page(widthSixtyFourths: plan.widthSixtyFourths, heightSixtyFourths: plan.heightSixtyFourths,
-                              boxes: plan.boxes, reported: reported, outsidePlan: drawn + rest))
+                              boxes: boxes, reported: reported, outsidePlan: drawn + rest))
         }
         var digests: [Data] = []
         while let d = record.produced.pageImageDigests[digests.count] { digests.append(d) }

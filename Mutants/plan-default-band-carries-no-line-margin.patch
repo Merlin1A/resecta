@@ -1,0 +1,21 @@
+Property: A box painted with its default band carries its line margin for the picture's net.
+Area: the plan's facts (PaintPlan.make)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PaintPlanDefaultBandTests
+Must go red: RedactionCoreTests/PaintPlanDefaultBandTests defaultBandCarriesItsLineMargin
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index 205492d68..6684880b4 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -638,9 +638,7 @@ private struct Maker {
+         for (index, m) in made.enumerated() where m.box.inkCheckable {
+             if let h = m.lineHeight { facts.inkLineHeights[index] = h }
+         }
+-        for (index, m) in made.enumerated() {
+-            if let fallback = m.fallback { facts.defaultFallbacks[index] = fallback }
+-        }
++
+         facts.otherWords = complement.lines.flatMap { $0.words.map(\.box) }
+         for m in made { facts.firstEditStarts.merge(m.starts) { first, _ in first } }
+         return facts

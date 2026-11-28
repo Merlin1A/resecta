@@ -114,6 +114,9 @@ package enum DefaultHold: Hashable, Sendable {
     case pageDrawsLinesOrShading
     /// The page's painting was not followed to its end.
     case drawingNotRead
+    /// The page's picture, before any fill, shows ink in the part of the
+    /// band the line margin does not hold: the picture's net withdrew it.
+    case inkInSlot
 }
 
 /// The four kinds of region a plan tells apart, from how the region was

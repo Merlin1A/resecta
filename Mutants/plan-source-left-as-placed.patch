@@ -1,0 +1,19 @@
+Property: The run's plan comes from the switch's policy, so the plan reads the page's words and the user's switch.
+Area: the run's plan source (RunRecord.planSource)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanSwitchTests
+Must go red: RedactionEngineTests/PlanSwitchTests sourceAndChoice
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift
+index 71fbfb5f..394c4b52 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift
+@@ -7,7 +7,7 @@ extension RunRecord {
+     /// the page's words and the user's switch. The one place it is set: no
+     /// launch argument, environment value, default or stored value reaches
+     /// it. A test that needs the plan as placed hands that source in.
+-    package static let planSource: PlanSource = .switchPolicy
++    package static let planSource: PlanSource = .asPlaced
+ 
+     /// The plan's source and the user's switch as the plan reads them: under
+     /// "as placed" the switch is ignored; under the switch's policy it

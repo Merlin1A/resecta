@@ -34,10 +34,11 @@ struct DrawnPlanTests {
          hand(CGRect(x: 0.50, y: 0.80, width: 0.0005, height: 0.02))]
     }
 
+    /// The page's kept plan under `source`, the run's own unless a case names another.
     static func drawn(_ regions: [RedactionRegion], cropBox: CGSize = letter, rotation: Int = 0, switchOn: Bool = false,
-                      dpi: Int = 300, fill: FillColor = .black) -> DrawnPlan {
+                      dpi: Int = 300, fill: FillColor = .black, source: PlanSource = RunRecord.planSource) -> DrawnPlan {
         DrawnPlan(pageIndex: 0, regions: regions, cropBox: cropBox, rotation: rotation,
-                  switchOn: switchOn, exportDPI: dpi, fillColor: fill)
+                  switchOn: switchOn, exportDPI: dpi, fillColor: fill, read: nil, source: source)
     }
 
     @Test("Under as placed, each box is one admitted region and the rectangle drawn is that region")
@@ -45,7 +46,7 @@ struct DrawnPlanTests {
         let regions = Self.regions()
         let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
         #expect(admitted.count == 3)
-        let page = Self.drawn(regions)
+        let page = Self.drawn(regions, source: .asPlaced)
         let plan = try #require(page.plan)
         #expect(page.boxes.count == 3)
         for (box, region) in zip(page.boxes, admitted) {
@@ -95,6 +96,20 @@ struct DrawnPlanTests {
         // One sixty-fourth of a point on one side makes another plan.
         #expect(base != Self.drawn(regions, cropBox: CGSize(width: 612 + 1.0 / 64, height: 792)))
         #expect(base != Self.drawn(Array(regions.dropLast(2))))
+    }
+
+    @Test("A page drawn before its read keeps the plan made as placed with no read, marked as made without it")
+    func beforeTheRead() throws {
+        let regions = Self.regions()
+        let before = DrawnPlan.beforeRead(pageIndex: 0, regions: regions, cropBox: Self.letter, rotation: 0,
+                                          switchOn: true, exportDPI: 300, fillColor: .black)
+        let placed = Self.drawn(regions, switchOn: true, source: .asPlaced)
+        #expect(before.madeWithoutRead)
+        #expect(!placed.madeWithoutRead && !Self.drawn(regions).madeWithoutRead)
+        #expect(before.plan == placed.plan && before.boxes == placed.boxes && before.filledPixels == placed.filledPixels)
+        #expect(before.switchOn && before.exportDPI == 300 && before.fillColor == .black)
+        #expect(before != placed, "the mark tells it from a plan made with the page's read")
+        #expect(before.stamped(pageVersion: 3, fromStoredRegions: true).madeWithoutRead, "kept, it stays marked")
     }
 
     @Test("A page whose side cannot be read has no plan and draws no box")

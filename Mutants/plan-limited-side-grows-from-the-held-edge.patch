@@ -1,0 +1,22 @@
+Property: A box held by a limit line still paints the growth "as placed" starts: growth is read from each growing region's own "as placed" edge as well as from the box's held edge, so a detached mark between the two is covered.
+Area: the producer's plan paint (PageRasterizer.paintPlan, asPlacedRect)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanSwitchTests
+Must go red: RedactionEngineTests/PlanSwitchTests limitedSideKeepsTheAsPlacedGrowth
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index 68d303cf8..83d08507a 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -409,10 +409,7 @@ extension PageRasterizer {
+                    let (fill, projection) = Self.boxFillAndProjection(
+                        box: placed, regions: regionsByID, raster: raster, content: content, shownDPI: shownDPI) {
+                     rect = rect.union(fill.bitmapRect)
+-                    if regionGrows,
+-                       let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
+-                        rect = rect.union(grown)
+-                    }
++                    _ = (regionGrows, projection)
+                 } else {
+                     let filled = normalizedToFillPixels(r, content: content)
+                     if !filled.intersection(bitmap).isEmpty { rect = rect.union(filled.intersection(bitmap)) }

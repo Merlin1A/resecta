@@ -1,0 +1,20 @@
+Property: The run's record carries each box whose default band the producer withdrew.
+Area: the run's record (RunRecord.Produced.record)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter DefaultBandNetTests
+Must go red: RedactionEngineTests/DefaultBandNetTests markInTheSlotWithdrawsTheBand
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+index d08be397..f8f74fc7 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+@@ -254,9 +254,6 @@ extension RunRecord.Produced {
+         for (box, verdict) in result.inkVerdicts {
+             inkVerdicts[RunRecord.BoxPosition(pageIndex: pageIndex, box: box)] = verdict
+         }
+-        for box in result.defaultBandsWithdrawn {
+-            defaultBandsWithdrawn.insert(RunRecord.BoxPosition(pageIndex: pageIndex, box: box))
+-        }
+         if !result.regionsPaintedOutsideThePlan.isEmpty {
+             regionsPaintedOutsideThePlan[pageIndex] = result.regionsPaintedOutsideThePlan
+         }

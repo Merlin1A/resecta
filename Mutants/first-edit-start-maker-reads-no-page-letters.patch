@@ -1,0 +1,19 @@
+Property: A joined box on one row is on one line only when no letter of another line, of all the page's letters the maker reads, lies wholly inside its paint. Here the maker reads no page letters.
+Area: the first edit's start (engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'FirstEditStartTests'
+Must go red: RedactionEngineTests/FirstEditStartTests aLetterOfAnotherLineInThePaint
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index b0daac120..15d5ea27c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -229,7 +229,7 @@ private struct Maker {
+         let members = made.regions
+         let paint = made.box.paint
+         let oneLine = members.count > 1
+-            && FirstEditStartRule.oneLineBox(rows: made.rowTights, paint: paint, pageLetters: pageLetters)
++            && FirstEditStartRule.oneLineBox(rows: made.rowTights, paint: paint, pageLetters: [])
+         let tights = members.map { i in letterRects(placed[i].region.selected).reduce(placed[i].rect) { $0.union($1) } }
+         for (k, i) in members.enumerated() {
+             let region = placed[i].region

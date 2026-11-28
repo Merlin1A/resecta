@@ -3,10 +3,11 @@ import Foundation
 import RedactionCore
 
 extension RunRecord {
-    /// Where a run's plan comes from. The one place it is set: no launch
-    /// argument, environment value, default or stored value reaches it. A
-    /// test that needs the switch's policy hands a plan in by hand.
-    package static let planSource: PlanSource = .asPlaced
+    /// Where a run's plan comes from: the switch's policy, so the plan reads
+    /// the page's words and the user's switch. The one place it is set: no
+    /// launch argument, environment value, default or stored value reaches
+    /// it. A test that needs the plan as placed hands that source in.
+    package static let planSource: PlanSource = .switchPolicy
 
     /// The plan's source and the user's switch as the plan reads them: under
     /// "as placed" the switch is ignored; under the switch's policy it

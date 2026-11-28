@@ -59,12 +59,12 @@ struct BoxCheckTests {
         #expect(Set(Self.cases.map(\.number)).count == 24)
     }
 
-    @Test("The check's planted failures are fourteen, each a patch in the repository's Mutants folder")
+    @Test("The check's planted failures are fifteen, each a patch in the repository's Mutants folder")
     func plantedFailures() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../../../../Mutants").standardized
         let names = try FileManager.default.contentsOfDirectory(atPath: root.path)
             .filter { $0.hasPrefix("box-check-") && $0.hasSuffix(".patch") }
-        #expect(names.count == 14, "\(names.sorted())")
+        #expect(names.count == 15, "\(names.sorted())")
     }
 
     @Test("The drawing reader's planted failures are thirty-three, each a patch in the repository's Mutants folder")
