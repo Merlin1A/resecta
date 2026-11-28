@@ -19,8 +19,11 @@ struct RunPlanKeptTests {
         RunRecord.DrawnRegion(id: UUID(), normalizedRect: rect, kind: kind)
     }
 
-    static func page(_ regions: [RunRecord.DrawnRegion], index: Int = 0, switchOn: Bool = false) -> RunRecord.Page {
-        RunRecord.Page(pageIndex: index, regions: regions, cropBox: letter, rotation: 0, switchOn: switchOn)
+    /// The page's record made under "as placed", unless a case names another source.
+    static func page(_ regions: [RunRecord.DrawnRegion], index: Int = 0, switchOn: Bool = false,
+                     source: PlanSource = .asPlaced) -> RunRecord.Page {
+        RunRecord.Page(pageIndex: index, regions: regions, cropBox: letter, rotation: 0, switchOn: switchOn,
+                       read: nil, source: source)
     }
 
     /// The as-placed plan's boxes for the same regions: the admitted ones, each
@@ -67,9 +70,8 @@ struct RunPlanKeptTests {
         #expect(plan.widthSixtyFourths == 39_168 && plan.heightSixtyFourths == 50_688)
     }
 
-    @Test("Under the release's plan source the user's switch is not read: switched on, every box is as placed")
+    @Test("Under \"as placed\" the user's switch is not read: switched on, every box is as placed")
     func switchIgnoredAsPlaced() throws {
-        #expect(RunRecord.planSource == .asPlaced)
         let choice = RunRecord.planChoice(source: .asPlaced, switchOn: true)
         #expect(choice.source == .asPlaced && !choice.switchOn)
         let regions = Self.everyKind()

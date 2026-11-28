@@ -187,6 +187,7 @@ public final class PageRasterizer: @unchecked Sendable {
             }
             result.regionsPaintedOutsideThePlan = planPaint.outsidePlan
             result.inkVerdicts = planPaint.inkVerdicts
+            result.defaultBandsWithdrawn = planPaint.defaultsWithdrawn
             return result
         }
     }

@@ -38,6 +38,9 @@ struct PlanPaint: Sendable, Equatable {
     /// Some box was made larger by the ink check.
     var inkWidened: Bool { !inkWidenedBoxes.isEmpty }
     var inkWidenedBoxes: Set<Int> = []
+    /// The boxes painted with their line margin in place of their default
+    /// band: the page's picture showed ink in the band's slot.
+    var defaultsWithdrawn: Set<Int> = []
 }
 
 /// The ink check's inputs for one box of a page's plan.
@@ -294,6 +297,13 @@ extension PageRasterizer {
 
     // MARK: - The plan path
 
+    /// Whether a box the ink check judges keeps today's growth in its floor.
+    /// It stays true until a differential count passes: for each word, the
+    /// ink pixels the check's paint leaves unfilled that growth fills, read
+    /// from a render of that word alone, at 150 and 300 dpi, must be zero.
+    /// Only then may a judged box drop growth.
+    static let judgedBoxKeepsGrowth = true
+
     /// The plan's boxes painted, with any region no box
     /// holds painted on its own as the region path paints it. In this
     /// order: every growth read on the rendered page before any fill, then
@@ -337,6 +347,28 @@ extension PageRasterizer {
         var widened: Set<Int> = []
         let atSwitch = page.planSource == .switchPolicy
         var grid: InkCheck.Grid?
+        // 4b'. The default band's net, before anything else reads a box: a box
+        // painted with its default band where the page's picture shows ink in
+        // the part of the band its line margin does not hold is painted with
+        // its line margin instead. The net only withdraws a band.
+        var boxes = page.boxes
+        var withdrawn: Set<Int> = []
+        for (index, fallback) in page.defaultFallbacks.sorted(by: { $0.key < $1.key })
+        where index < boxes.count && boxes[index].defaultWidth == .taken {
+            let box = boxes[index]
+            if let band = PixelPlan.project(inner: box.inner, paint: box.paint, limitAbove: box.limitAbove,
+                                            limitBelow: box.limitBelow, raster: raster)?.painted,
+               let margin = PixelPlan.project(inner: fallback.inner, paint: fallback.paint,
+                                              limitAbove: fallback.limitAbove, limitBelow: fallback.limitBelow,
+                                              raster: raster)?.painted {
+                if grid == nil { grid = Self.greyGrid(context: ctx) }
+                guard let grid, !InkCheck.inkInSlot(band: band, lineMargin: margin, grid: grid, raster: raster)
+                else { boxes[index] = fallback; withdrawn.insert(index); continue }
+            } else {
+                boxes[index] = fallback
+                withdrawn.insert(index)
+            }
+        }
         // What was shown for a box that does not project here: filled as one
         // more stray rectangle, and read back.
         var shownOutsidePlan: [CGRect] = []
@@ -349,23 +381,70 @@ extension PageRasterizer {
             }
             return rect
         }
-        // A box's paint at "as placed": its projection, its regions' own
-        // fills, and its growth over the ink that crosses its edge.
         // The quality the page was shown at: each box's paint holds the fill
         // shown there (`boxFill`).
         let shownDPI = page.confirmedPage?.shownDPI
+        // What the run paints today for each region of a box, whole: the
+        // region's own "as placed" box, made as the record makes it at run
+        // entry (from the region's share as drawn, unclamped; its rectangle,
+        // no limit), painted as that box is: its projection, its fill, the
+        // fill shown and its growth over the ink that crosses that box's
+        // edge; a region whose own box does not project, as a region painted
+        // on its own is: its fill, its growth and its fill shown. A limit
+        // holds a box's edge in, up to two pixels inside where "as placed"
+        // paints, so the box's paint alone can leave a row today paints.
+        var drawnShares: [UUID: CGRect] = [:]
+        for drawn in page.confirmedPage?.regions ?? [] { drawnShares[drawn.id] = drawn.normalizedRect }
+        func todayRect(_ box: PaintedBox, grows: Bool) throws -> CGRect? {
+            var rect = CGRect.null
+            for id in box.regionIDs {
+                guard let region = regionsByID[id] else { continue }
+                let r = region.normalizedRect
+                let drawn = drawnShares[id] ?? r
+                let regionGrows = grows && growsOnInk[id] == true
+                let share = PointRect(minX: Double(drawn.minX), minY: Double(drawn.minY),
+                                      maxX: Double(drawn.maxX), maxY: Double(drawn.maxY))
+                if let placed = PaintPlan.asPlaced(regions: [(id, share)], widthSixtyFourths: raster.widthSixtyFourths,
+                                                   heightSixtyFourths: raster.heightSixtyFourths).boxes.first,
+                   let (fill, projection) = Self.boxFillAndProjection(
+                       box: placed, regions: regionsByID, raster: raster, content: content, shownDPI: shownDPI) {
+                    rect = rect.union(fill.bitmapRect)
+                    if regionGrows,
+                       let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
+                        rect = rect.union(grown)
+                    }
+                } else {
+                    let filled = normalizedToFillPixels(r, content: content)
+                    if !filled.intersection(bitmap).isEmpty { rect = rect.union(filled.intersection(bitmap)) }
+                    if regionGrows, let grown = try inkGrowthRect(context: ctx, fillRect: filled) {
+                        rect = rect.union(grown)
+                    }
+                    if let shown = Self.shownRegionFill(region, raster: raster, shownDPI: shownDPI) {
+                        rect = rect.union(shown)
+                    }
+                }
+            }
+            return rect.isNull ? nil : rect
+        }
+        // A box's paint at "as placed": its projection, its regions' own
+        // fills, and its growth over the ink that crosses its edge, joined
+        // with what the run paints today for each of its regions
+        // (`todayRect`). Nil when the box does not project: its inner holds
+        // each of its regions' own "as placed" rectangles, so then none of
+        // those boxes projects either, and its regions are painted on their
+        // own, as today.
         func asPlacedRect(_ box: PaintedBox, grows: Bool) throws -> CGRect? {
             guard let (fill, projection) = Self.boxFillAndProjection(
                 box: box, regions: regionsByID, raster: raster, content: content,
                 shownDPI: shownDPI) else { return nil }
             var rect = fill.bitmapRect
-            if grows,
-               let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
+            if grows, let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
                 rect = rect.union(grown)
             }
+            if let today = try todayRect(box, grows: grows) { rect = rect.union(today) }
             return rect
         }
-        for (index, box) in page.boxes.enumerated() {
+        for (index, box) in boxes.enumerated() {
             let grows = box.regionIDs.contains(where: { growsOnInk[$0] == true })
             // Only a box the plan marks checkable: placed from typed text,
             // still anchored, not painted as drawn. A box placed from the
@@ -388,7 +467,7 @@ extension PageRasterizer {
                             var rect = withRegionFills(projection.painted.bitmapRect, of: box)
                             // Its floor: "as placed", with what was shown. A box that does not
                             // project as placed still holds what was shown for it.
-                            if let floor = try asPlacedRect(box, grows: grows) {
+                            if let floor = try asPlacedRect(box, grows: grows && Self.judgedBoxKeepsGrowth) {
                                 rect = rect.union(floor)
                             } else if let shown = Self.shownFill(box: box, regions: regionsByID, raster: raster,
                                                                  shownDPI: shownDPI) {
@@ -447,6 +526,7 @@ extension PageRasterizer {
         result.outsidePlan = Set(strays.map(\.id))
         result.inkVerdicts = verdicts
         result.inkWidenedBoxes = widened
+        result.defaultsWithdrawn = withdrawn
         return result
     }
 

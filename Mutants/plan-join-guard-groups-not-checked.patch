@@ -1,0 +1,19 @@
+Property: A joined group is checked once as a whole and split into single regions when it holds an unselected letter no member holds.
+Area: the plan's join guard (PaintPlan.make, groups)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PaintPlanJoinGuardTests
+Must go red: RedactionCoreTests/PaintPlanJoinGuardTests groupHoldingAWordNoPairHoldsIsSplit
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index f1f353ae..7026ab47 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -237,7 +237,7 @@ private struct Maker {
+         }
+         return order.flatMap { r -> [[Int]] in
+             let group = members[r]!
+-            return group.count > 1 && !guarded(group) ? group.map { [$0] } : [group]
++            return [group]
+         }
+     }
+ 

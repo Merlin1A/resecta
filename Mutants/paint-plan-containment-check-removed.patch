@@ -5,11 +5,11 @@ Must go red: RedactionCoreTests/PaintPlanBandTests bandHoldsTheRegion
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
-index f7fe787b..920ab51f 100644
+index 6bbbcfa..e7c14ee 100644
 --- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
-@@ -316,14 +316,14 @@ private struct Maker {
-                        treatment: outcome, band: made.inner != tight, asDrawn: false, width: made.width)
+@@ -375,14 +375,14 @@ private struct Maker {
+             return result
          case .band:
              let rows = read?.rows ?? []
 -            let band = self.band(tight: tight, rows: rows)

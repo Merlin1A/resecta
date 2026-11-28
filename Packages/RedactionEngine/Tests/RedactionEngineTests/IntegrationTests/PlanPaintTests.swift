@@ -125,7 +125,8 @@ struct PlanPaintTests {
     /// `recordOffset`: the record's rectangle moved by this many points to the
     /// right of the page's region (the page's data and its regions apart).
     static func run(boxes: [CGRect], text: Bool = false, ink: [CGRect] = [], fill: FillColor = .black,
-                    recordOmits: Set<Int> = [], recordOffset: CGFloat = 0) async throws -> Run {
+                    recordOmits: Set<Int> = [], recordOffset: CGFloat = 0,
+                    source: PlanSource = .asPlaced) async throws -> Run {
         let doc = try #require(PDFDocument(data: pdf(ink: ink)))
         let page = try #require(doc.page(at: 0))
         let ids = boxes.map { _ in UUID() }
@@ -142,12 +143,15 @@ struct PlanPaintTests {
                                    source: text ? .searchMatch(term: "x") : .manual)
         }
         let crop = page.bounds(for: .cropBox)
+        // The plan as placed unless a case names another source: these cases
+        // read the paint of a box whose plan is known, the region rounded out.
         let confirmed = RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: crop.size, rotation: page.rotation,
-                                       switchOn: false)
-        let data = PDFPageData(
+                                       switchOn: false, read: nil, source: source)
+        var data = PDFPageData(
             page: page, pageIndex: 0, regions: regions, fillColor: fill, targetDPI: dpi,
             pipelineMode: .secureRasterization, rotation: page.rotation,
             cropBoxBounds: crop, cgPage: page.pageRef, hasText: false, confirmedPage: confirmed)
+        data.planSource = source
         let result = try await PageRasterizer().rasterize(data, dpiCap: dpi)
         let plan = try #require(confirmed.plan)
         let raster = try #require(PixelPlan.Raster(widthSixtyFourths: plan.widthSixtyFourths,
