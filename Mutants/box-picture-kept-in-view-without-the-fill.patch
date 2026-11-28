@@ -1,0 +1,17 @@
+Property: What the walk and the selection bar keep in view holds the box's whole fill, not only its stored rectangle.
+Area: the editor, one picture of a box
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxPictureTests
+Must go red: ResectaAppTests/BoxPictureTests tableCase(_:) [keep-in-view-share-found-rest]; ResectaAppTests/BoxPictureTests tableCase(_:) [keep-in-view-share-paint-only]
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Sources/ResectaApp/State/BoxPicture+Share.swift
++++ b/Sources/ResectaApp/State/BoxPicture+Share.swift
+@@ -9,7 +9,7 @@
+     nonisolated static func keepInViewShare(own: CGRect, fill: CGRect?, paint: CGRect?,
+                                             start: CGRect?, selectedAlone: Bool) -> CGRect {
+         let line = selectedAlone ? (start ?? own) : own
+-        return (fill ?? paint ?? own).union(line)
++        return own.union(line)
+     }
+ 
+     /// The Search walk's frame for its current result, as a share of the page:

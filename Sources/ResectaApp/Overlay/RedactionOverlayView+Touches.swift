@@ -128,15 +128,15 @@ extension RedactionOverlayView {
         if isGroupMoving {
             // Group move — translate all selected regions by delta
             updateGroupMove(to: point)
-            setNeedsDisplay()
+            redrawGesture()
         } else if isDraggingExistingRegion {
             // Move selected region — update position from touch minus offset
             updateSelectedRegionForMove(to: point)
-            setNeedsDisplay()
+            redrawGesture()
         } else if let handle = activeResizeHandle {
             // Resize selected region
             updateSelectedRegionForResize(handle: handle, to: point)
-            setNeedsDisplay()
+            redrawGesture()
         } else if let origin = marqueeOrigin {
             // Lasso marquee — track the marching-ants rect over
             // empty space. The branch is reached only when touchesBegan

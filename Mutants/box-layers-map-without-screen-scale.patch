@@ -1,0 +1,18 @@
+Property: The map to the device's pixels is the view's map to its window times the screen's scale. Here the screen's scale is left out, so the layers are snapped to points.
+Area: editor overlay (the boxes' layers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxLayerHostTests
+Must go red: ResectaAppTests/BoxLayerHostTests veilOnTheDeviceLines
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/BoxLayers.swift b/Sources/ResectaApp/Overlay/BoxLayers.swift
+--- a/Sources/ResectaApp/Overlay/BoxLayers.swift
++++ b/Sources/ResectaApp/Overlay/BoxLayers.swift
+@@ -410,7 +410,7 @@
+         let o = view.convert(CGPoint.zero, to: nil)
+         let x = view.convert(CGPoint(x: 1, y: 0), to: nil)
+         let y = view.convert(CGPoint(x: 0, y: 1), to: nil)
+-        let k = window.screen.scale
++        let k: CGFloat = 1
+         let toDevice = CGAffineTransform(a: (x.x - o.x) * k, b: (x.y - o.y) * k,
+                                          c: (y.x - o.x) * k, d: (y.y - o.y) * k,
+                                          tx: o.x * k, ty: o.y * k)

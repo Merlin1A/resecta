@@ -1,0 +1,17 @@
+Property: No layer the host makes moves with an animation. Here a key's layer is made with its implicit actions on.
+Area: editor overlay (the boxes' layers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxLayerHostTests
+Must go red: ResectaAppTests/BoxLayerHostTests everyLayerIsQuiet
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/BoxLayers.swift b/Sources/ResectaApp/Overlay/BoxLayers.swift
+--- a/Sources/ResectaApp/Overlay/BoxLayers.swift
++++ b/Sources/ResectaApp/Overlay/BoxLayers.swift
+@@ -430,7 +430,6 @@
+         } else {
+             layers[spec.key]?.removeFromSuperlayer()
+             layer = Self.make(spec.kind)
+-            layer.actions = Self.quietActions
+             layers[spec.key] = layer
+             applied[spec.key] = nil
+         }

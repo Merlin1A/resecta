@@ -1,0 +1,17 @@
+Property: A move's touch applies the moved boxes' layers and those whose plan box it changes. Here each touch runs a pass over every box.
+Area: editor overlay (the boxes' layers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxLayerHostTests
+Must go red: ResectaAppTests/BoxLayerHostTests moveAppliesTheMovedBox
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+DrawEntry.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+DrawEntry.swift
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+DrawEntry.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+DrawEntry.swift
+@@ -23,6 +23,6 @@
+     /// moves (with those whose plan box it changes).
+     func redrawGesture() {
+         topCanvas?.setNeedsDisplay()
+-        boxLayers.mark(.keys(Set(selectedIDs.map(\.uuidString))))
++        boxLayers.mark(.all)
+     }
+ }

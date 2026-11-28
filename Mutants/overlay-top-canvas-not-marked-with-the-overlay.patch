@@ -5,19 +5,19 @@ Must go red: ResectaAppTests/OverlayTopCanvasTests setNeedsDisplayReachesTheCanv
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView.swift
-index d57cb0c0..2c2ae8ad 100644
 --- a/Sources/ResectaApp/Overlay/RedactionOverlayView.swift
 +++ b/Sources/ResectaApp/Overlay/RedactionOverlayView.swift
-@@ -288,12 +288,10 @@ class RedactionOverlayView: UIView {
+@@ -347,13 +347,11 @@
  
      override func setNeedsDisplay() {
          super.setNeedsDisplay()
 -        topCanvas?.setNeedsDisplay()
+         boxLayers.mark(.all)
      }
  
      override func setNeedsDisplay(_ rect: CGRect) {
          super.setNeedsDisplay(rect)
 -        topCanvas?.setNeedsDisplay(rect)
+         boxLayers.mark(.all)
      }
  
-     // MARK: - Hit Testing (tool-based routing)

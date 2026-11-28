@@ -407,7 +407,7 @@ enum ResectaTokens {
 
     // MARK: - Touch Targets
 
-    enum TouchTarget {
+    nonisolated enum TouchTarget {
         /// 22pt — Apple Pencil hit area
         static let pencil: CGFloat = 22
         /// 46pt — Apple HIG minimum EFFECTIVE (as-hit-tested) touch

@@ -28,6 +28,7 @@ final class OverlayTopCanvas: UIView {
 
     override func draw(_ rect: CGRect) {
         guard let host, let ctx = UIGraphicsGetCurrentContext() else { return }
+        host.drawPassCount += 1
         ctx.clip(to: rect)
         host.drawSearchLayer(ctx: ctx, in: rect)
         host.drawSnapGuides(ctx: ctx)

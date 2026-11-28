@@ -138,10 +138,8 @@ extension RedactionOverlayView {
                                  y: max(page.minY, min(newRect.minY, page.maxY - newRect.height)))
 
         storeFromGesture(idx, overlayRect: newRect)
-
-        // Dirty-rect optimization: only invalidate old + new rect area (+ margin for shadow/handles)
-        let margin: CGFloat = 20
-        let dirtyRect = oldOverlayRect.union(newRect).insetBy(dx: -margin, dy: -margin)
-        setNeedsDisplay(dirtyRect)
+        // The touch's redraw (`redrawGesture`) marks the top canvas and the
+        // moved box's layers; a mark of the whole overlay here would pass
+        // every box.
     }
 }

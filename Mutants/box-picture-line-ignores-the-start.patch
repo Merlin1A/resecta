@@ -1,0 +1,17 @@
+Property: A found box selected alone draws its line where a first edit of it would start.
+Area: the editor, one picture of a box
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxPictureTests
+Must go red: ResectaAppTests/BoxPictureTests tableCase(_:) [found-single-2c]
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Sources/ResectaApp/Overlay/BoxPicture.swift
++++ b/Sources/ResectaApp/Overlay/BoxPicture.swift
+@@ -112,7 +112,7 @@
+         let f = input.fingerScale
+         let selected = input.selection != .rest
+         let fill = input.fill ?? input.paint ?? input.own
+-        let lineRect = input.selection == .single ? (input.start ?? input.own) : input.own
++        let lineRect = input.own
+         let lineWidthScreen = selected ? C.lineSelected.width : C.line.width
+ 
+         let centres: [Handle] = input.selection == .single
