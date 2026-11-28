@@ -1,0 +1,19 @@
+Property: A plan made without the page's words gives no start. Here it gives the start worked out with no letters.
+Area: the first edit's start (engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'FirstEditStartTests'
+Must go red: RedactionEngineTests/FirstEditStartTests aPlanWithoutTheWordsGivesNoStart
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+index c037955cc..078ede4b6 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+@@ -61,7 +61,7 @@ public struct DrawnPlan: Equatable, Sendable {
+     /// drawn or edited by hand, for a region the plan does not hold, and for
+     /// every region of a plan made without the page's words.
+     public func firstEditStart(for regionID: UUID) -> FirstEditStart? {
+-        wordsGiven ? starts[regionID] : nil
++        starts[regionID]
+     }
+ 
+     /// This plan as kept at a page version, from the stored regions or not.

@@ -1,0 +1,22 @@
+Property: A one-line start stops at the nearest neighbour's near edge, never inside its own rectangle. Here it may reach inside.
+Area: the first edit's start (engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'FirstEditStartTests'
+Must go red: RedactionEngineTests/FirstEditStartTests tableCase
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
+index 1bb9af39c..575fd5c34 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
+@@ -55,9 +55,9 @@ package enum FirstEditStartRule {
+         if neighbours.contains(where: { $0.contains(own) && $0 != own }) { return (own, 2) }
+         if oneLineBox, neighbourTights.allSatisfy({ $0.minY == tight.minY && $0.maxY == tight.maxY }) {
+             var right = paint.maxX
+-            for n in neighbours where n.maxX > own.maxX { right = Swift.min(right, Swift.max(own.maxX, n.minX)) }
++            for n in neighbours where n.maxX > own.maxX { right = Swift.min(right, n.minX) }
+             var left = paint.minX
+-            for n in neighbours where n.minX < own.minX { left = Swift.max(left, Swift.min(own.minX, n.maxX)) }
++            for n in neighbours where n.minX < own.minX { left = Swift.max(left, n.maxX) }
+             return (PageRect64(minX: left, minY: paint.minY, maxX: right, maxY: paint.maxY), 3)
+         }
+         return (paint, 4)
