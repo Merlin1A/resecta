@@ -1,7 +1,7 @@
-Property: The entry makes each plan under the plan source it is handed, so its fixed cases read the switch's policy on a build whose own source is still the plan as placed.
+Property: The entry makes each plan under the plan source it is handed, so a fixed case reads the plan as placed on a build whose own source is the switch's policy.
 Area: measured run entry
 Test command: cd Packages/RedactionEngine && swift test --filter MeasuredRunTests
-Must go red: RedactionEngineTests/MeasuredRunTests "Under the switch's policy the on arm widens the value's box and the off arm does not"; RedactionEngineTests/MeasuredRunTests "A short, long or empty run is unreadable"; RedactionEngineTests/MeasuredRunTests "Two runs of one page give the same boxes"; RedactionEngineTests/MeasuredRunTests "With the product's selection a Search box is read from its line, and the switch widens it"
+Must go red: RedactionEngineTests/MeasuredRunTests "Under the plan as placed the two arms give one plan, and the run is unreadable"
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift

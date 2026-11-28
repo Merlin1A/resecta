@@ -1,0 +1,19 @@
+Property: With covered letters out of the complement, the join guard keeps apart two regions that adjoin only across a covered word when their joined rectangle holds an unselected word.
+Area: the plan's join guard (PaintPlan.make, groups)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PaintPlanJoinGuardTests
+Must go red: RedactionCoreTests/PaintPlanJoinGuardTests joinAcrossAHandCoveredWordIsGuarded
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index f1f353ae..de5ea4d6 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -219,7 +219,7 @@ private struct Maker {
+             let own = group.compactMap { tights[$0] }
+             guard let first = own.first else { return true }
+             let joined = own.dropFirst().reduce(first) { $0.union($1) }
+-            return !others.contains { letter in
++            return true || !others.contains { letter in
+                 Self.holdsMiddle(joined, letter) && !own.contains { Self.holdsMiddle($0, letter) }
+             }
+         }

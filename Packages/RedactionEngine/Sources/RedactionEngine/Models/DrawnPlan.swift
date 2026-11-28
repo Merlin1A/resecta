@@ -49,6 +49,12 @@ public struct DrawnPlan: Equatable, Sendable {
     /// changed.
     public private(set) var pageVersion: Int?
     public private(set) var fromStoredRegions: Bool?
+    /// True for a plan the editor keeps for a page drawn before the page's
+    /// read is held (`beforeRead`): made as placed, without the page's words,
+    /// so the page shows what it showed before the plan read them. It is
+    /// only drawn: no reader takes it as the page's plan made with its read,
+    /// and the editor makes the plan again when the read is held.
+    public private(set) var madeWithoutRead = false
 
     /// This plan as kept at a page version, from the stored regions or not.
     public func stamped(pageVersion: Int, fromStoredRegions: Bool) -> DrawnPlan {
@@ -80,16 +86,39 @@ public struct DrawnPlan: Equatable, Sendable {
     }
 
     /// The page's plan from `regions` as drawn, the page's crop box and
-    /// rotation, and the settings it is drawn under.
+    /// rotation, the page's read, and the settings it is drawn under. The
+    /// read is the one the run's entry hands the same maker
+    /// (`DocumentState.pageReads`), so the two make the same plan.
     public init(pageIndex: Int, regions: [RedactionRegion], cropBox: CGSize, rotation: Int,
-                switchOn: Bool, exportDPI: Int, fillColor: FillColor) {
+                switchOn: Bool, exportDPI: Int, fillColor: FillColor, read: RunRecord.PageRead? = nil) {
+        self.init(pageIndex: pageIndex, regions: regions, cropBox: cropBox, rotation: rotation, switchOn: switchOn,
+                  exportDPI: exportDPI, fillColor: fillColor, read: read, source: RunRecord.planSource)
+    }
+
+    /// The same page under a plan source given here, as `RunRecord.Page`
+    /// takes one: the editor passes the run's own; a test can name another.
+    package init(pageIndex: Int, regions: [RedactionRegion], cropBox: CGSize, rotation: Int,
+                 switchOn: Bool, exportDPI: Int, fillColor: FillColor, read: RunRecord.PageRead?, source: PlanSource) {
         let plan = RunRecord.Page.makePlan(regions: regions.map(RunRecord.DrawnRegion.init(region:)),
-                                           cropBox: cropBox, rotation: rotation, switchOn: switchOn)
+                                           cropBox: cropBox, rotation: rotation, switchOn: switchOn, read: read,
+                                           source: source)
         self.init(pageIndex: pageIndex, switchOn: switchOn, exportDPI: exportDPI, fillColor: fillColor, plan: plan,
                   filledPixels: Self.filledPixels(regions: regions, cropBox: cropBox, rotation: rotation,
                                                   dpi: exportDPI),
                   boxFills: plan.map { Self.boxFills(plan: $0, regions: regions, cropBox: cropBox,
                                                      rotation: rotation, dpi: exportDPI) } ?? [])
+    }
+
+    /// The plan a page drawn before its read is held keeps: the same regions
+    /// and settings, made as placed with no read, and marked
+    /// `madeWithoutRead`.
+    public static func beforeRead(pageIndex: Int, regions: [RedactionRegion], cropBox: CGSize, rotation: Int,
+                                  switchOn: Bool, exportDPI: Int, fillColor: FillColor) -> DrawnPlan {
+        var drawn = DrawnPlan(pageIndex: pageIndex, regions: regions, cropBox: cropBox, rotation: rotation,
+                              switchOn: switchOn, exportDPI: exportDPI, fillColor: fillColor, read: nil,
+                              source: .asPlaced)
+        drawn.madeWithoutRead = true
+        return drawn
     }
 
     /// Each box's fill as a run with a record paints it: the page's pixels

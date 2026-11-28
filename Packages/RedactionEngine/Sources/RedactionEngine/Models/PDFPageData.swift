@@ -67,17 +67,20 @@ public struct PDFPageData: @unchecked Sendable {
         confirmedPage?.plan.map { ($0.widthSixtyFourths, $0.heightSixtyFourths) }
     }
 
-    /// The plan source the producer paints under: the run's, which is "as
-    /// placed". Only a test, inside the package, sets the switch's policy,
-    /// together with a plan it made under that policy.
+    /// The plan source the producer paints under: the run's, which is the
+    /// switch's policy. Only a test, inside the package, sets another,
+    /// together with a plan it made under that source.
     package var planSource: PlanSource = RunRecord.planSource
 
     /// What the ink check reads for a box, by the box's place in the plan:
-    /// the height of its line and the boxes of the page's other words. Empty
-    /// until the run reads the page's words at entry; a test fills it. A box
-    /// the check would read with nothing here is painted as placed, its ink
-    /// growth as today, and recorded as not judged.
-    package var inkCheckInputs: [Int: InkCheckInputs] = [:]
+    /// the height of its line and the boxes of the page's other words. From
+    /// the record's page, made with its plan from the page's read at entry;
+    /// a test can set it. A box the check would read with nothing here is
+    /// painted as placed, its ink growth as today, and recorded as not judged.
+    package var inkCheckInputs: [Int: InkCheckInputs]
+    /// For each box painted with its default band, the same box with its
+    /// line margin (from the record's page); a test can set it.
+    package var defaultFallbacks: [Int: PaintedBox]
 
     public init(page: PDFPage, pageIndex: Int, regions: [RedactionRegion],
                 fillColor: FillColor, targetDPI: Int, pipelineMode: PipelineMode,
@@ -98,6 +101,8 @@ public struct PDFPageData: @unchecked Sendable {
         self.cgPage = cgPage
         self.hasText = hasText
         self.fallbackReason = fallbackReason
+        self.inkCheckInputs = confirmedPage?.inkCheckInputs ?? [:]
+        self.defaultFallbacks = confirmedPage?.defaultFallbacks ?? [:]
         self.confirmedPage = confirmedPage
     }
 }

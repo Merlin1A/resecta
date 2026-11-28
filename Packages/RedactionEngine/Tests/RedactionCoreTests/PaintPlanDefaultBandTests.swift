@@ -112,6 +112,53 @@ import RedactionCore
         #expect(box.inner.minX == T.s(72) && box.inner.maxX == T.s(180))
     }
 
+    // MARK: - Never less than the line margin
+
+    /// The pixels a box is painted as, at `dpi`.
+    static func pixels(_ b: PaintedBox, dpi: Int) throws -> PixelPlan.PixelRect {
+        let raster = try #require(PixelPlan.Raster(widthSixtyFourths: T.W, heightSixtyFourths: T.H, dpi: dpi))
+        return try #require(PixelPlan.project(inner: b.inner, paint: b.paint, limitAbove: b.limitAbove,
+                                              limitBelow: b.limitBelow, raster: raster)).painted
+    }
+
+    /// The default band's box holds the line margin's, in page terms and in
+    /// the pixels painted at three resolutions.
+    static func expectHoldsTheLineMargin(_ box: PaintedBox, _ lineMargin: PaintedBox) throws {
+        #expect(box.paint.contains(lineMargin.paint), "\(box.paint) holds \(lineMargin.paint)")
+        for dpi in [72, 150, 300] {
+            let a = try pixels(box, dpi: dpi), b = try pixels(lineMargin, dpi: dpi)
+            #expect(a.minX <= b.minX && a.minY <= b.minY && a.maxX >= b.maxX && a.maxY >= b.maxY, "at \(dpi) dpi")
+        }
+    }
+
+    @Test("A value half a point after its label: the default band's paint holds the line margin's, though the band starts at the label's end")
+    func narrowGapHoldsTheLineMargin() throws {
+        let (sheet, _, value) = Self.labelRow(value: "Smith", gap: 0.5)
+        let region = T.matched(sheet, value)
+        let box = Self.box(sheet, region)
+        let lineMargin = Self.box(sheet, region, drawing: .notRead)
+        #expect(box.defaultWidth == .taken && box.bandMade)
+        #expect(lineMargin.paint.minX < T.s(102), "the line margin reaches past the label's end, so the case means something")
+        try Self.expectHoldsTheLineMargin(box, lineMargin)
+    }
+
+    @Test("A line of small type above the band, closer than the line above the value: the default band's paint holds the line margin's")
+    func closerSmallTypeNeighbourHoldsTheLineMargin() throws {
+        var sheet = Sheet()
+        sheet.line(count: 14, y: 704)
+        sheet.word("x", x: 300, y: 696.5, width: 3, height: 4)
+        sheet.word("Name:", x: 72, y: 686)
+        let value = sheet.word("Smith", x: 106, y: 686)
+        sheet.line(count: 14, y: 672)
+        let region = T.matched(sheet, value)
+        let box = Self.box(sheet, region)
+        let lineMargin = Self.box(sheet, region, drawing: .notRead)
+        #expect(box.defaultWidth == .taken && box.bandMade)
+        #expect(T.s(696.5) + Self.policy.margin.entry(letterSize: T.s(4)) < lineMargin.paint.maxY,
+                "the small line's limit lies below the line margin's top, so the case means something")
+        try Self.expectHoldsTheLineMargin(box, lineMargin)
+    }
+
     @Test("A value in mid-line: the paint is today's line margin")
     func midLineKeepsTheLineMargin() {
         var sheet = Sheet()
@@ -121,6 +168,22 @@ import RedactionCore
         let today = Self.box(sheet, region, drawing: .notRead)
         #expect(box.paint == today.paint && box.inner == today.inner && !box.bandMade)
         #expect(box.defaultWidth == .taken)
+    }
+
+    @Test("A box painted with its default band carries its line margin for the picture's net; a box whose default adds nothing carries none")
+    func defaultBandCarriesItsLineMargin() throws {
+        let (sheet, _, value) = Self.labelRow(value: "Smith")
+        let region = T.matched(sheet, value)
+        let made = Self.plan(sheet, [region])
+        let fallback = try #require(made.facts.defaultFallbacks[0])
+        let lineMargin = Self.box(sheet, region, drawing: .notRead)
+        #expect(fallback.inner == lineMargin.inner && fallback.paint == lineMargin.paint)
+        #expect(fallback.limitAbove == lineMargin.limitAbove && fallback.limitBelow == lineMargin.limitBelow)
+        #expect(fallback.defaultWidth == .notTaken(.inkInSlot) && !fallback.bandMade)
+        #expect(fallback.regionIDs == made.plan.boxes[0].regionIDs)
+        var mid = Sheet()
+        let lines = ComplementReadingTests.paragraph(&mid, counts: [6, 6, 6])
+        #expect(Self.plan(mid, [T.matched(mid, lines[1][2])]).facts.defaultFallbacks.isEmpty)
     }
 
     // MARK: - Where it is not taken

@@ -5,13 +5,14 @@ Must go red: RedactionCoreTests/PaintPlanDefaultBandTests pictureInTheSlot; Reda
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index 46e363987..a85d83af1 100644
 --- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
-@@ -419,7 +419,6 @@ private struct Maker {
+@@ -478,7 +478,6 @@ private struct Maker {
          // in it is not told by how far the selected text reaches.
          let wordInBand = complement.lines.contains { $0.words.contains { $0.box.sharesArea(with: band) } }
          let drawnInPaint = drawing.objects.contains { $0.sharesArea(with: on.paint) }
 -        guard !wordInBand && !drawnInPaint else { return lineMargin(.notTaken(.wordOrDrawingInBand)) }
-         return (band, on.paint, on.above, on.below, .taken)
-     }
- 
+         // Never less than the line margin: the band's paint is taken with
+         // the line margin's, and each limit is the looser of the two (none
+         // is looser than any), so the box's pixels hold the line margin's

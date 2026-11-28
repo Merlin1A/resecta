@@ -1,0 +1,19 @@
+Property: An unselected letter blocks a join when its middle lies inside the joined rectangle, not only when the whole letter does.
+Area: the plan's join guard (PaintPlan.make, groups)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PaintPlanJoinGuardTests
+Must go red: RedactionCoreTests/PaintPlanJoinGuardTests headingBoxDoesNotJoinAcrossTheGap
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index f1f353ae..6032a4a1 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -220,7 +220,7 @@ private struct Maker {
+             guard let first = own.first else { return true }
+             let joined = own.dropFirst().reduce(first) { $0.union($1) }
+             return !others.contains { letter in
+-                Self.holdsMiddle(joined, letter) && !own.contains { Self.holdsMiddle($0, letter) }
++                joined.contains(letter) && !own.contains { Self.holdsMiddle($0, letter) }
+             }
+         }
+         for (k, a) in joinable.enumerated() {

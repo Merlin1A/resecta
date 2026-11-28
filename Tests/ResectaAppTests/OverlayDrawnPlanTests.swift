@@ -23,12 +23,14 @@ struct OverlayDrawnPlanTests {
     }
 
     @Test("Drawing a page keeps its plan as the run's entry makes it, with the quality and the fill")
-    func drawingKeepsThePlan() throws {
+    func drawingKeepsThePlan() async throws {
         let pdf = try Self.document()
         let regions = [RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.04), source: .manual),
                        RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)]
         let documentState = DocumentState()
         documentState.sourceDocument = pdf
+        await documentState.fillPageReads(for: [0])
+        let read = try #require(documentState.pageReads[0], "the page's read is held")
         let state = RedactionState()
         // The page's stored regions, as the editor holds them: two changes to
         // page 0, so the page is at version 2.
@@ -57,7 +59,7 @@ struct OverlayDrawnPlanTests {
         // Kept at the page's version (2: its two stored regions) and drawn
         // from the stored regions.
         let expected = DrawnPlan(pageIndex: 0, regions: regions, cropBox: page.bounds(for: .cropBox).size,
-                                 rotation: page.rotation, switchOn: false, exportDPI: 150, fillColor: .white)
+                                 rotation: page.rotation, switchOn: false, exportDPI: 150, fillColor: .white, read: read)
             .stamped(pageVersion: 2, fromStoredRegions: true)
         #expect(page.rotation == 90)
         #expect(kept == expected)
@@ -74,9 +76,14 @@ struct OverlayDrawnPlanTests {
     }
 
     /// A coordinator wired to `pdf` and `state`, with the chosen quality 300.
-    static func coordinator(_ pdf: PDFDocument, _ state: RedactionState, suite: String) throws -> PDFViewCoordinator {
+    /// A coordinator on `pdf` whose document holds each page's read, as the
+    /// run's entry does: for a page whose read it does not hold yet, the
+    /// editor keeps only the plan made without it (`aPageDrawnBeforeItsRead`).
+    static func coordinator(_ pdf: PDFDocument, _ state: RedactionState, suite: String) async throws -> PDFViewCoordinator {
         let documentState = DocumentState()
         documentState.sourceDocument = pdf
+        await documentState.fillPageReads(for: Set(0..<pdf.pageCount))
+        try #require(documentState.pageReads.count == pdf.pageCount, "every page's read is held")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defaults.removePersistentDomain(forName: suite)
         let settings = SettingsState(defaults: defaults)
@@ -88,11 +95,67 @@ struct OverlayDrawnPlanTests {
         return coordinator
     }
 
+    @Test("A page drawn before its read is held keeps the plan made as placed, marked, and the quality it was shown at; when the read is held the page redraws and keeps the plan made with it")
+    func aPageDrawnBeforeItsRead() async throws {
+        let pdf = try Self.document()
+        let documentState = DocumentState()
+        documentState.sourceDocument = pdf
+        let suite = "OverlayDrawnPlanTests.aPageDrawnBeforeItsRead"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        let settings = SettingsState(defaults: defaults)
+        settings.exportDPI = 300
+        let state = RedactionState()
+        let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)
+        state.addRegion(region, page: 0, undoManager: nil)
+        let coordinator = PDFViewCoordinator()
+        coordinator.documentState = documentState
+        coordinator.redactionState = state
+        coordinator.settingsState = settings
+        let view = PDFView(frame: CGRect(x: 0, y: 0, width: 300, height: 420))
+        view.document = pdf
+        let page = try #require(pdf.page(at: 0))
+        let overlay = try #require(coordinator.pdfView(view, overlayViewFor: page) as? RedactionOverlayView)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 300, height: 420))
+        overlay.frame = window.bounds
+        window.addSubview(overlay)
+        window.isHidden = false
+        overlay.configure(with: [region], selectedIDs: [])
+        try #require(documentState.pageReads[0] == nil, "precondition: the page's read is not held")
+
+        // The pass before the read keeps the plan made as placed, marked.
+        overlay.setNeedsDisplay()
+        overlay.boxLayers.applyPendingPass()
+        let cropBox = page.bounds(for: .cropBox).size
+        let before = try #require(state.drawnPlans[0], "a page drawn before its read keeps a plan")
+        #expect(before.madeWithoutRead)
+        #expect(before == DrawnPlan.beforeRead(pageIndex: 0, regions: [region], cropBox: cropBox,
+                                               rotation: page.rotation, switchOn: false, exportDPI: 300,
+                                               fillColor: settings.fillColor)
+            .stamped(pageVersion: 1, fromStoredRegions: true))
+        #expect(state.shownDPIs[0] == 300, "a page drawn while its read is asked for notes the quality it was shown at")
+        let passes = overlay.boxLayers.boxPassCount
+
+        // The pass asked for the read; once it is held the page redraws.
+        for _ in 0..<400 where documentState.pageReads[0] == nil {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        let read = try #require(documentState.pageReads[0], "the pass asked for the page's read, and it is held")
+        overlay.boxLayers.applyPendingPass()
+        #expect(overlay.boxLayers.boxPassCount > passes, "the read's arrival redraws the page")
+        let kept = try #require(state.drawnPlans[0])
+        #expect(!kept.madeWithoutRead, "the plan is made again with the read")
+        #expect(kept == DrawnPlan(pageIndex: 0, regions: [region], cropBox: cropBox, rotation: page.rotation,
+                                  switchOn: false, exportDPI: 300, fillColor: settings.fillColor, read: read)
+            .stamped(pageVersion: 1, fromStoredRegions: true))
+        withExtendedLifetime((coordinator, window)) {}
+    }
+
     @Test("Under the cap of 150 a drawn page keeps its plan at 150, the quality the run uses")
-    func keptPlanReadsTheCap() throws {
+    func keptPlanReadsTheCap() async throws {
         let pdf = try Self.document()
         let state = RedactionState()
-        let coordinator = try Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.keptPlanReadsTheCap")
+        let coordinator = try await Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.keptPlanReadsTheCap")
         #expect(coordinator.qualityCap == 300)
         let regions = [RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.04), source: .manual)]
         coordinator.noteDrawn(pageIndex: 0, regions: regions)
@@ -110,12 +173,12 @@ struct OverlayDrawnPlanTests {
     }
 
     @Test("A cap that changes while a page is on screen keeps that page's plan at the new quality")
-    func aCapChangeRedrawsThePagesOnScreen() throws {
+    func aCapChangeRedrawsThePagesOnScreen() async throws {
         let pdf = try Self.document()
         let state = RedactionState()
         let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)
         state.regions[0] = [region]
-        let coordinator = try Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapChangeRedraws")
+        let coordinator = try await Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapChangeRedraws")
         let view = PDFView(frame: CGRect(x: 0, y: 0, width: 300, height: 420))
         view.document = pdf
         let page = try #require(pdf.page(at: 0))
@@ -154,12 +217,12 @@ struct OverlayDrawnPlanTests {
     }
 
     @Test("A kept plan carries the page's version and whether it was drawn from the stored regions")
-    func keptPlanIsStamped() throws {
+    func keptPlanIsStamped() async throws {
         let pdf = try Self.document()
         let state = RedactionState()
         let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)
         state.addRegion(region, page: 0, undoManager: nil)
-        let coordinator = try Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.keptPlanIsStamped")
+        let coordinator = try await Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.keptPlanIsStamped")
         coordinator.noteDrawn(pageIndex: 0, regions: [region])
         #expect(state.drawnPlans[0]?.pageVersion == 1)
         #expect(state.drawnPlans[0]?.fromStoredRegions == true)
@@ -176,12 +239,12 @@ struct OverlayDrawnPlanTests {
     }
 
     @Test("A cap change during a drag, then the lift: the kept plan is at the new quality")
-    func aCapChangeMidDragThenLift() throws {
+    func aCapChangeMidDragThenLift() async throws {
         let pdf = try Self.document()
         let state = RedactionState()
         let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)
         state.addRegion(region, page: 0, undoManager: nil)
-        let coordinator = try Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapChangeMidDragThenLift")
+        let coordinator = try await Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapChangeMidDragThenLift")
         let view = PDFView(frame: CGRect(x: 0, y: 0, width: 300, height: 420))
         view.document = pdf
         let page = try #require(pdf.page(at: 0))
@@ -211,12 +274,12 @@ struct OverlayDrawnPlanTests {
     }
 
     @Test("A cap drop makes an off-screen page's plan again at 150 but keeps the 300 it was shown at; a 150 run joins it")
-    func aCapDropKeepsTheShownQuality() throws {
+    func aCapDropKeepsTheShownQuality() async throws {
         let pdf = try Self.document()
         let state = RedactionState()
         let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)
         state.addRegion(region, page: 0, undoManager: nil)
-        let coordinator = try Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapDropKeepsTheShownQuality")
+        let coordinator = try await Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapDropKeepsTheShownQuality")
         // Drawn at 300, then off screen: no overlay is active.
         coordinator.noteDrawn(pageIndex: 0, regions: [region])
         #expect(state.drawnPlans[0]?.exportDPI == 300)
@@ -237,12 +300,12 @@ struct OverlayDrawnPlanTests {
     }
 
     @Test("A cap change keeps no plan of regions a page was not drawn with")
-    func aCapChangeKeepsOnlyWhatWasDrawn() throws {
+    func aCapChangeKeepsOnlyWhatWasDrawn() async throws {
         let pdf = try Self.document()
         let state = RedactionState()
         let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)
         state.addRegion(region, page: 0, undoManager: nil)
-        let coordinator = try Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapChangeKeepsOnlyWhatWasDrawn")
+        let coordinator = try await Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapChangeKeepsOnlyWhatWasDrawn")
         coordinator.noteDrawn(pageIndex: 0, regions: [region])
         let other = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03), source: .manual)
         state.addRegion(other, page: 0, undoManager: nil)

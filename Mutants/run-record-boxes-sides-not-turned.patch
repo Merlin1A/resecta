@@ -5,13 +5,13 @@ Must go red: RedactionEngineTests/RunRecordBoxesTests "Each case" (quarterTurn)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-index 201ef8fb..cc3162c6 100644
+index d08be39..af3a1eb 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-@@ -118,7 +118,7 @@ public struct RunRecord: Equatable, Sendable {
-         package static func makePlan(regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
-                                      read: PageRead? = nil,
-                                      source: PlanSource = RunRecord.planSource) -> PaintPlan? {
+@@ -138,7 +138,7 @@ public struct RunRecord: Equatable, Sendable {
+         package static func makePlanAndInputs(regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
+                                               read: PageRead?, source: PlanSource)
+             -> (plan: PaintPlan, inputs: [Int: InkCheckInputs], fallbacks: [Int: PaintedBox])? {
 -            let turned = ((rotation % 360) + 360) % 180 != 0
 +            let turned = false && ((rotation % 360) + 360) % 180 != 0
              guard let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
