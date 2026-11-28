@@ -334,46 +334,55 @@ al6_report() {
     AL6_SEEN="$AL6_SEEN"$'\n'"$key"
     violate "$1: $2:$3$4"
 }
+# The lines of one AL-6 scan ($1 message, $2 path, $3 where, $4 the scan's
+# lines, $5 its exit status), each reported (al6_report), or printed when
+# $1 is a note. Each scan runs to its end into a variable before this reads
+# it, and a scan that failed is an offence, never "no offences": a loop fed
+# by `< <(...)` reads nothing from a producer that died, and under bash 3.2
+# (the gate runner's) such loops inside a loop each leave a descriptor open,
+# until past about 256 the shell dies.
+al6_lines() {
+    local off
+    [ "$5" -eq 0 ] || violate "AL-6 could not read $2$3 ($1; exit $5): it was not checked"
+    while IFS= read -r off; do
+        [ -n "$off" ] || continue
+        case "$1" in
+            "AL-6 note:"*) printf '%s: %s:%s%s\n' "$1" "$2" "$off" "$3" >&2 ;;
+            *) al6_report "$1" "$2" "$off" "$3" ;;
+        esac
+    done <<< "$4"
+    return 0
+}
 # Every AL-6 shape on the added lines of one file ($1 path, $2 its kind from
 # al6_kind, $3 where, appended to each message): from the staged diff, the
 # range's whole diff, or, with AL6_COMMIT set, that commit's own diff.
 al6_file() {
-    local path="$1" kind="$2" at="$3" off
-    while IFS= read -r off; do
-        [ -n "$off" ] && al6_report "AL-6 planning shorthand" "$path" "$off" "$at"
-    done < <(CASE_SENSITIVE=1 scan_added "$path" "$AL6_RE" "Shorthand:ok")
+    local path="$1" kind="$2" at="$3" out rc
+    out=$(CASE_SENSITIVE=1 scan_added "$path" "$AL6_RE" "Shorthand:ok") && rc=0 || rc=$?
+    al6_lines "AL-6 planning shorthand" "$path" "$at" "$out" "$rc"
     if [ "$kind" = code ]; then
-        while IFS= read -r off; do
-            [ -n "$off" ] && al6_report "AL-6 planning shorthand (section reference)" "$path" "$off" "$at"
-        done < <(CASE_SENSITIVE=1 EXEMPT="$AL6_SECTION_EXEMPT" scan_added "$path" "$AL6_SECTION_RE" "Shorthand:ok")
+        out=$(CASE_SENSITIVE=1 EXEMPT="$AL6_SECTION_EXEMPT" scan_added "$path" "$AL6_SECTION_RE" "Shorthand:ok") && rc=0 || rc=$?
+        al6_lines "AL-6 planning shorthand (section reference)" "$path" "$at" "$out" "$rc"
     fi
-    while IFS= read -r off; do
-        [ -n "$off" ] && al6_report "AL-6 planning shorthand (markdown name)" "$path" "$off" "$at"
-    done < <(CASE_SENSITIVE=1 EXEMPT="$AL6_MDREF_EXEMPT" scan_added "$path" "$AL6_MDREF_RE" "Shorthand:ok")
-    while IFS= read -r off; do
-        [ -n "$off" ] && al6_report "AL-6 planning shorthand (package key)" "$path" "$off" "$at"
-    done < <(CASE_SENSITIVE=1 scan_added "$path" "$AL6_KEY_RE" "Shorthand:ok")
-    while IFS= read -r off; do
-        [ -n "$off" ] && al6_report "AL-6 planning shorthand (working name)" "$path" "$off" "$at"
-    done < <(CASE_SENSITIVE=1 scan_added "$path" "$AL6_SEAT_RE" "Shorthand:ok")
+    out=$(CASE_SENSITIVE=1 EXEMPT="$AL6_MDREF_EXEMPT" scan_added "$path" "$AL6_MDREF_RE" "Shorthand:ok") && rc=0 || rc=$?
+    al6_lines "AL-6 planning shorthand (markdown name)" "$path" "$at" "$out" "$rc"
+    out=$(CASE_SENSITIVE=1 scan_added "$path" "$AL6_KEY_RE" "Shorthand:ok") && rc=0 || rc=$?
+    al6_lines "AL-6 planning shorthand (package key)" "$path" "$at" "$out" "$rc"
+    out=$(CASE_SENSITIVE=1 scan_added "$path" "$AL6_SEAT_RE" "Shorthand:ok") && rc=0 || rc=$?
+    al6_lines "AL-6 planning shorthand (working name)" "$path" "$at" "$out" "$rc"
     if [ "$kind" = data ]; then
-        while IFS= read -r off; do
-            [ -n "$off" ] && al6_report "AL-6 planning shorthand (planning word)" "$path" "$off" "$at"
-        done < <(CASE_SENSITIVE=1 scan_added "$path" "$AL6_DATA_WORD_RE" "Shorthand:ok")
-        while IFS= read -r off; do
-            [ -n "$off" ] && printf 'AL-6 note: Shorthand:ok exempts this whole data line: %s:%s%s\n' "$path" "$off" "$at" >&2
-        done < <(CASE_SENSITIVE=1 scan_added "$path" 'Shorthand:ok' "")
+        out=$(CASE_SENSITIVE=1 scan_added "$path" "$AL6_DATA_WORD_RE" "Shorthand:ok") && rc=0 || rc=$?
+        al6_lines "AL-6 planning shorthand (planning word)" "$path" "$at" "$out" "$rc"
+        out=$(CASE_SENSITIVE=1 scan_added "$path" 'Shorthand:ok' "") && rc=0 || rc=$?
+        al6_lines "AL-6 note: Shorthand:ok exempts this whole data line" "$path" "$at" "$out" "$rc"
         return 0
     fi
-    while IFS= read -r off; do
-        [ -n "$off" ] && al6_report "AL-6 planning shorthand (process word)" "$path" "$off" "$at"
-    done < <(COMMENT_ONLY=1 scan_added "$path" "$AL6_PROCESS_RE" "Shorthand:ok")
-    while IFS= read -r off; do
-        [ -n "$off" ] && al6_report "AL-6 planning shorthand (step token)" "$path" "$off" "$at"
-    done < <(CASE_SENSITIVE=1 COMMENT_ONLY=1 scan_added "$path" "$AL6_STEP_RE" "Shorthand:ok")
-    while IFS= read -r off; do
-        [ -n "$off" ] && al6_report "AL-6 planning shorthand (author name)" "$path" "$off" "$at"
-    done < <(CASE_SENSITIVE=1 COMMENT_ONLY=1 scan_added "$path" "$AL6_NAME_RE" "Shorthand:ok")
+    out=$(COMMENT_ONLY=1 scan_added "$path" "$AL6_PROCESS_RE" "Shorthand:ok") && rc=0 || rc=$?
+    al6_lines "AL-6 planning shorthand (process word)" "$path" "$at" "$out" "$rc"
+    out=$(CASE_SENSITIVE=1 COMMENT_ONLY=1 scan_added "$path" "$AL6_STEP_RE" "Shorthand:ok") && rc=0 || rc=$?
+    al6_lines "AL-6 planning shorthand (step token)" "$path" "$at" "$out" "$rc"
+    out=$(CASE_SENSITIVE=1 COMMENT_ONLY=1 scan_added "$path" "$AL6_NAME_RE" "Shorthand:ok") && rc=0 || rc=$?
+    al6_lines "AL-6 planning shorthand (author name)" "$path" "$at" "$out" "$rc"
     return 0
 }
 # AL-6's commit pass over $RANGE: each commit that is not a merge, oldest
@@ -381,15 +390,20 @@ al6_file() {
 # has no diff of its own here; what it settles is in the range's whole
 # diff). A path one commit adds and a later commit deletes is read too.
 al6_range_commits() {
-    local c path kind
-    for c in $(git rev-list --no-merges --reverse "$RANGE"); do
+    local c path kind commits paths rc
+    commits=$(git rev-list --no-merges --reverse "$RANGE") && rc=0 || rc=$?
+    [ "$rc" -eq 0 ] || violate "AL-6 could not list the commits of $RANGE (exit $rc): none was checked"
+    for c in $commits; do
+        paths=$(git diff-tree --no-commit-id --name-only -r --diff-filter=AM --root "$c") && rc=0 || rc=$?
+        [ "$rc" -eq 0 ] || violate "AL-6 could not list the paths of commit ${c:0:12} (exit $rc): none was checked"
         while IFS= read -r path; do
+            [ -n "$path" ] || continue
             kind=$(al6_kind "$path")
             [ -n "$kind" ] || continue
             AL6_COMMIT="$c"
             al6_file "$path" "$kind" " (in commit ${c:0:12})"
             AL6_COMMIT=""
-        done < <(git diff-tree --no-commit-id --name-only -r --diff-filter=AM --root "$c")
+        done <<< "$paths"
     done
     return 0
 }
@@ -397,27 +411,25 @@ al6_range_commits() {
 # data shapes (register id, Markdown name, package key, working name, planning
 # word); a marker on a message line is printed as a note, as in data.
 al6_range_messages() {
-    local c off where
-    for c in $(git rev-list "$RANGE"); do
+    local c where commits message out rc
+    commits=$(git rev-list "$RANGE") && rc=0 || rc=$?
+    [ "$rc" -eq 0 ] || violate "AL-6 could not list the commits of $RANGE (exit $rc): no message was checked"
+    for c in $commits; do
         where="commit message ${c:0:12}"
-        while IFS= read -r off; do
-            [ -n "$off" ] && al6_report "AL-6 planning shorthand" "$where" "$off" ""
-        done < <(git log -1 --format=%B "$c" | PATTERN="$AL6_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL")
-        while IFS= read -r off; do
-            [ -n "$off" ] && al6_report "AL-6 planning shorthand (markdown name)" "$where" "$off" ""
-        done < <(git log -1 --format=%B "$c" | PATTERN="$AL6_MDREF_RE" EXEMPT="$AL6_MDREF_EXEMPT" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL")
-        while IFS= read -r off; do
-            [ -n "$off" ] && al6_report "AL-6 planning shorthand (package key)" "$where" "$off" ""
-        done < <(git log -1 --format=%B "$c" | PATTERN="$AL6_KEY_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL")
-        while IFS= read -r off; do
-            [ -n "$off" ] && al6_report "AL-6 planning shorthand (working name)" "$where" "$off" ""
-        done < <(git log -1 --format=%B "$c" | PATTERN="$AL6_SEAT_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL")
-        while IFS= read -r off; do
-            [ -n "$off" ] && al6_report "AL-6 planning shorthand (planning word)" "$where" "$off" ""
-        done < <(git log -1 --format=%B "$c" | PATTERN="$AL6_DATA_WORD_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL")
-        while IFS= read -r off; do
-            [ -n "$off" ] && printf 'AL-6 note: Shorthand:ok exempts this whole message line: %s:%s\n' "$where" "$off" >&2
-        done < <(git log -1 --format=%B "$c" | PATTERN='Shorthand:ok' OVERRIDE="" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL")
+        message=$(git log -1 --format=%B "$c") && rc=0 || rc=$?
+        [ "$rc" -eq 0 ] || violate "AL-6 could not read the $where (exit $rc): it was not checked"
+        out=$(printf '%s\n' "$message" | PATTERN="$AL6_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL") && rc=0 || rc=$?
+        al6_lines "AL-6 planning shorthand" "$where" "" "$out" "$rc"
+        out=$(printf '%s\n' "$message" | PATTERN="$AL6_MDREF_RE" EXEMPT="$AL6_MDREF_EXEMPT" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL") && rc=0 || rc=$?
+        al6_lines "AL-6 planning shorthand (markdown name)" "$where" "" "$out" "$rc"
+        out=$(printf '%s\n' "$message" | PATTERN="$AL6_KEY_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL") && rc=0 || rc=$?
+        al6_lines "AL-6 planning shorthand (package key)" "$where" "" "$out" "$rc"
+        out=$(printf '%s\n' "$message" | PATTERN="$AL6_SEAT_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL") && rc=0 || rc=$?
+        al6_lines "AL-6 planning shorthand (working name)" "$where" "" "$out" "$rc"
+        out=$(printf '%s\n' "$message" | PATTERN="$AL6_DATA_WORD_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL") && rc=0 || rc=$?
+        al6_lines "AL-6 planning shorthand (planning word)" "$where" "" "$out" "$rc"
+        out=$(printf '%s\n' "$message" | PATTERN='Shorthand:ok' OVERRIDE="" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL") && rc=0 || rc=$?
+        al6_lines "AL-6 note: Shorthand:ok exempts this whole message line" "$where" "" "$out" "$rc"
     done
     return 0
 }
@@ -748,6 +760,57 @@ AL-6 note: Shorthand:ok exempts this whole message line: commit message C1:3: Sh
         echo "audit-lint --self-test: AL-6 message pass OK (a key in a commit message is reported on its line; a marked line is a note)"
     else
         echo "audit-lint --self-test: AL-6 message pass DRIFTED — expected one package-key line and one note for commit C1, got: $actual" >&2
+        exit 1
+    fi
+    # AL-6's commit pass on one commit of 45 clean test resources: every file
+    # is read, none is reported, and the shell's open descriptors are as many
+    # at the last file as at the first (bash 3.2 kept one open for each scan
+    # that found nothing in each file, until it died past about 256).
+    al6_tmp=$(mktemp -d "${TMPDIR:-/tmp}/al6-many.XXXXXX")
+    actual=$( (
+        cd "$al6_tmp" && git init -q . && mkdir -p Tests/A || exit 1
+        export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+        c0=$(git commit-tree "$(git write-tree)" -m base) || exit 1
+        for i in $(seq 1 45); do printf '{\n  "case": %s\n}\n' "$i" > "Tests/A/x$i.json"; done
+        git add Tests/A && c1=$(git commit-tree "$(git write-tree)" -p "$c0" -m many) || exit 1
+        eval "al6_file_read() $(declare -f al6_file | sed 1d)"
+        al6_fds=""
+        al6_file() { al6_fds="$al6_fds $(ls /dev/fd | wc -l)"; al6_file_read "$@"; }
+        RANGE="$c0..$c1"; FAIL=0; al6_range_commits 2>/dev/null
+        set -- $al6_fds; first="$1"; eval "last=\${$#}"
+        echo "files=$# offences=$FAIL fds=$([ "$first" = "$last" ] && echo flat || echo "$first to $last")"
+    ) )
+    rm -rf "$al6_tmp"
+    if [ "$actual" = "files=45 offences=0 fds=flat" ]; then
+        echo "audit-lint --self-test: AL-6 many files OK (45 clean files in one commit, each read; open descriptors flat from the first to the last)"
+    else
+        echo "audit-lint --self-test: AL-6 many files DRIFTED — expected files=45 offences=0 fds=flat, got: $actual" >&2
+        exit 1
+    fi
+    # AL-6 fails closed: with `git` made to fail on a commit's own diff, and
+    # then on its message, the commit pass and the message pass each report
+    # what they could not read, never "no offences".
+    al6_tmp=$(mktemp -d "${TMPDIR:-/tmp}/al6-closed.XXXXXX")
+    actual=$( (
+        cd "$al6_tmp" && git init -q . && mkdir -p Tests/A || exit 1
+        export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+        c0=$(git commit-tree "$(git write-tree)" -m base) || exit 1
+        printf '{\n  "rule": "x"\n}\n' > Tests/A/x.json
+        git add Tests/A && c1=$(git commit-tree "$(git write-tree)" -p "$c0" -m clean) || exit 1
+        RANGE="$c0..$c1"
+        git() { if [ "$1 ${2:-}" = "diff-tree -p" ]; then return 3; fi; command git "$@"; }
+        FAIL=0; al6_range_commits 2>/dev/null; diff=$FAIL
+        git() { if [ "$1" = log ]; then return 4; fi; command git "$@"; }
+        FAIL=0; al6_range_messages 2>/dev/null; message=$FAIL
+        unset -f git
+        FAIL=0; al6_range_commits 2>/dev/null; al6_range_messages 2>/dev/null; clean=$FAIL
+        echo "diff=$([ "$diff" -gt 0 ] && echo red || echo green) message=$([ "$message" -gt 0 ] && echo red || echo green) clean=$([ "$clean" -eq 0 ] && echo green || echo red)"
+    ) )
+    rm -rf "$al6_tmp"
+    if [ "$actual" = "diff=red message=red clean=green" ]; then
+        echo "audit-lint --self-test: AL-6 fails closed OK (a commit's diff and a message that cannot be read each fail; the same range read whole passes)"
+    else
+        echo "audit-lint --self-test: AL-6 fails closed DRIFTED — expected diff=red message=red clean=green, got: $actual" >&2
         exit 1
     fi
     # AL-5's scanner call fails closed: a missing scanner and a crashing
