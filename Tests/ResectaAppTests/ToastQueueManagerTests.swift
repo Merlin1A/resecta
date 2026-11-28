@@ -279,7 +279,7 @@ struct ToastQueueManagerTests {
         #expect(mgr.displayDuration(for: long) == 101.0)
         #expect(mgr.displayDuration(for: ToastItem(message: "Ok", severity: .info)) == 2.5)
         // On screen it stays its whole 12 seconds.
-        mgr.post(.encryptedSource(hadRestrictions: true))
+        mgr.enqueue(owner)
         let shown = try #require(mgr.activeToasts.first)
         clock.advance(11.5)
         mgr.settleClocks()
