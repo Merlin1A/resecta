@@ -22,6 +22,9 @@ struct VerificationDetailsSection: View {
     let deselectionSnapshot: RedactionState.DeselectionSnapshot?
     /// The run facts' lines (`VerificationResultsView.RunFactsStrip`).
     var runFactsLines: [String] = []
+    /// The run line that opens What Boxes Can Show
+    /// (`RunFactsStrip.doorLine(for:)`), when one does.
+    var runFactsDoorLine: String? = nil
     /// Page links show — and open the Preview — only while the redacted PDF
     /// exists; otherwise the captions carry the pages.
     var previewAvailable: Bool = false
@@ -366,12 +369,17 @@ struct VerificationDetailsSection: View {
 
     // MARK: - The card of facts
 
-    /// The run's own lines as facts, in their order: each line whole, with
-    /// nothing behind a tap. The first carries the `runFactsStrip`
-    /// identifier.
-    static func runLineFacts(_ lines: [String]) -> [ResultsFact] {
+    /// The run's own lines as facts, in their order: each line whole. The
+    /// line that is `doorLine` opens to one link row, What Boxes Can Show;
+    /// the others have nothing behind a tap. The first carries the
+    /// `runFactsStrip` identifier.
+    static func runLineFacts(_ lines: [String], doorLine: String? = nil) -> [ResultsFact] {
         lines.enumerated().map { position, line in
-            ResultsFact(id: position == 0 ? "runFactsStrip" : "runFactsLine_\(position)", shown: line)
+            let isDoor = line == doorLine
+            return ResultsFact(
+                id: position == 0 ? "runFactsStrip" : "runFactsLine_\(position)", shown: line,
+                door: isDoor ? LegalDocument.whatBoxesCanShow.title : nil,
+                doorHint: isDoor ? VerificationResultsView.RunFactsStrip.doorHint : nil)
         }
     }
 
@@ -389,7 +397,7 @@ struct VerificationDetailsSection: View {
 
     private var cardItems: [ResultsCardItem] {
         ResultsFactCard.items(
-            handedIn: facts, runLines: Self.runLineFacts(runFactsLines),
+            handedIn: facts, runLines: Self.runLineFacts(runFactsLines, doorLine: runFactsDoorLine),
             showsPageModes: VerificationResultsView.showsPageModes(report: report),
             deselection: Self.deselectionFact(snapshot: deselectionSnapshot),
             sweepLimit: Self.sweepLimitFact(report: report))

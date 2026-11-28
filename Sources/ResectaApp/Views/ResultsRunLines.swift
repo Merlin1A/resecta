@@ -36,6 +36,15 @@ extension VerificationResultsView.RunFactsStrip {
             : "\(count) boxes can still show how long their text is."
     }
 
+    /// The run line that opens What Boxes Can Show: the boxes line, when it
+    /// shows.
+    static func doorLine(for facts: VerificationResultsView.RunFacts) -> String? {
+        facts.burnedBoxes > 0 ? boxesLine(count: facts.burnedBoxes) : nil
+    }
+
+    /// The spoken hint on the link row that opens the page.
+    static var doorHint: String { "Opens \(LegalDocument.whatBoxesCanShow.title)." }
+
     /// The output's size, as the Files app gives a file's size.
     static func sizeLine(bytes: Int64) -> String {
         let formatter = ByteCountFormatter()

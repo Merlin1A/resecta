@@ -1,0 +1,19 @@
+Property: The lint marker on the page's one marked line is never drawn.
+Area: What Boxes Can Show, as the viewer draws it
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/WhatBoxesCanShowPageTests
+Must go red: ResectaAppTests/WhatBoxesCanShowPageTests markerNeverDrawn
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/LegalDocumentView.swift b/Sources/ResectaApp/Views/LegalDocumentView.swift
+--- a/Sources/ResectaApp/Views/LegalDocumentView.swift
++++ b/Sources/ResectaApp/Views/LegalDocumentView.swift
+@@ -174,8 +174,7 @@ struct LegalDocumentView: View {
+     /// .md files for the lint but never reach the sheet. Comments in the two
+     /// known documents are always single-line.
+     nonisolated static func inlineMarkdown(_ text: String) -> AttributedString {
+-        let stripped = text.replacingOccurrences(
+-            of: " ?<!--.*?-->", with: "", options: .regularExpression)
++        let stripped = text
+         return (try? AttributedString(
+             markdown: stripped,
+             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
