@@ -337,7 +337,8 @@ struct FirstEditSamplePageTests {
     /// model: the model is checked first, so a run without it fails here
     /// rather than passing on boxes Scan never placed.
     @Test("Where the name model tags names, the plan joins each capital line's three boxes, the two at one rectangle holding neither the other",
-          .enabled(if: ProcessInfo.processInfo.environment["FIRST_EDIT_SAMPLE_NAMES"] == "1"))
+          .enabled(if: ProcessInfo.processInfo.environment["FIRST_EDIT_SAMPLE_NAMES"] == "1",
+                   "runs where FIRST_EDIT_SAMPLE_NAMES=1, on a simulator that holds the name model"))
     func theNamedLinesJoinWhereTheModelTags() async throws {
         let text = "Last Friday Robert Miller met Sarah Thompson at the branch."
         let tagger = NameDetector.makeNameTagger(for: text)
