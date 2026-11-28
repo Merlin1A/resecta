@@ -1,0 +1,19 @@
+Property: A first move keeps the point of the page under the touch-down under the finger. Here the grab offset is taken where the drag passes the start slop.
+Area: the first edit's gesture (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstEditGestureTests
+Must go red: ResectaAppTests/FirstEditGestureTests everyGestureRowFromItsStart; ResectaAppTests/FirstEditGestureTests turnedMoveMovesTheStart
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
+index c221528aa..5dd5b44ff 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
+@@ -172,7 +172,7 @@ extension RedactionOverlayView {
+             if let start = firstEditStarts[selectedID], let touchDown = dragStartPoint {
+                 regions[idx].normalizedRect = start
+                 let origin = pdfNormalizedToOverlay(start).origin
+-                dragOffset = CGSize(width: touchDown.x - origin.x, height: touchDown.y - origin.y)
++                dragOffset = CGSize(width: point.x - origin.x, height: point.y - origin.y)
+             }
+         }
+ 

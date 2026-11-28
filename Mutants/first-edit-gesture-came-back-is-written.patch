@@ -1,0 +1,19 @@
+Property: A first move or resize that comes back to its start writes nothing and keeps the anchoring. Here it is committed.
+Area: the first edit's gesture (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstEditGestureTests
+Must go red: ResectaAppTests/FirstEditGestureTests everyGestureRowFromItsStart
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
+index d4518a50c..697887b9e 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
+@@ -232,7 +232,7 @@ extension RedactionOverlayView {
+         if isDraggingExistingRegion || activeResizeHandle != nil, hasPassedStartSlop, let id = selectedID,
+            firstEditStarts[id] != nil, let region = regions.first(where: { $0.id == id }),
+            let before = isDraggingExistingRegion ? preDragNormalizedRect : preResizeNormalizedRect,
+-           cameBackToTheStart([region], before: [id: before]) {
++           false {
+             restoreFirstEditCopies([id: before])
+             return
+         }

@@ -5,15 +5,15 @@ Must go red: ResectaAppTests/RunDoorHeldTouchTests cancelledTouchOpensTheDoor
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
-index bec0a9d8..2595f22c 100644
+index d4518a50c..2188f78cb 100644
 --- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
 +++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
-@@ -306,7 +306,7 @@ extension RedactionOverlayView {
-         }
-         // The page rectangles the gesture's steps took go back with the places.
+@@ -323,7 +323,7 @@ extension RedactionOverlayView {
+         // and a box the start slop un-anchored is anchored again: the restore,
+         // never the start.
          for i in regions.indices {
 -            if let before = preGestureDrawnPageRects[regions[i].id] { regions[i].drawnPageRect = before }
 +            _ = i
+             if firstEditStarts[regions[i].id] != nil { regions[i].textAnchored = true }
          }
          resetDragState()
-         setNeedsDisplay()
