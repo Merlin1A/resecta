@@ -32,10 +32,14 @@ nonisolated enum FirstEdit {
     /// it is now (made from the page's stored regions at the page's current
     /// version), else the plan `madeAtRead` makes from the stored regions.
     /// A kept plan of an older version can still hold a box that is gone,
-    /// and a start read from it would be that older page's.
+    /// and a start read from it would be that older page's. A plan kept
+    /// before the page's read is held (`madeWithoutRead`) is made without the
+    /// page's words, so no start is read from it either.
     static func currentPlan(kept: DrawnPlan?, pageVersion: Int,
                             madeAtRead: () -> DrawnPlan?) -> DrawnPlan? {
-        if let kept, kept.pageVersion == pageVersion, kept.fromStoredRegions == true { return kept }
+        if let kept, !kept.madeWithoutRead, kept.pageVersion == pageVersion, kept.fromStoredRegions == true {
+            return kept
+        }
         return madeAtRead()
     }
 
