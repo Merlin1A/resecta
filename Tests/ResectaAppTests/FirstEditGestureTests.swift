@@ -383,6 +383,13 @@ struct FirstEditGestureTests {
         var madeAtRead = false
         _ = FirstEdit.currentPlan(kept: fromCopy, pageVersion: 3) { madeAtRead = true; return nil }
         #expect(madeAtRead)
+        // Nor is a plan kept before the page's read is held, made without it.
+        let beforeRead = DrawnPlan.beforeRead(pageIndex: 0, regions: [], cropBox: Self.pageSize, rotation: 0,
+                                              switchOn: true, exportDPI: 150, fillColor: .black)
+            .stamped(pageVersion: 3, fromStoredRegions: true)
+        madeAtRead = false
+        _ = FirstEdit.currentPlan(kept: beforeRead, pageVersion: 3) { madeAtRead = true; return nil }
+        #expect(madeAtRead, "a plan kept before the page's read is passed over")
     }
 
     // MARK: - The gesture's own cases

@@ -451,13 +451,14 @@ struct FirstEditSamplePageTests {
     }
 
     /// The first page drawn through the keeper, as the canvas's drawing pass
-    /// draws it: with no read held, the first pass keeps no plan and asks for
-    /// the page's read; once the read is held, the redraw keeps the plan,
-    /// made with it.
+    /// draws it: with no read held, the first pass keeps the plan made
+    /// without it, marked so, and asks for the page's read; once the read is
+    /// held, the redraw keeps the plan, made with it.
     static func drawnUntilKept(_ coordinator: PDFViewCoordinator, _ state: RedactionState,
                                _ documentState: DocumentState) async throws -> DrawnPlan {
         coordinator.noteDrawn(pageIndex: 0, regions: state.regions[0] ?? [])
-        #expect(state.drawnPlans[0] == nil, "no plan is kept before the page's read is held")
+        #expect(state.drawnPlans[0]?.madeWithoutRead == true,
+                "before the page's read is held, the plan kept is the one made without it")
         for _ in 0..<400 where documentState.pageReads[0] == nil {
             try await Task.sleep(for: .milliseconds(25))
         }

@@ -1,0 +1,19 @@
+Property: A plan kept before the page's read is held (made without the page's words) gives no first-edit start; the start is read from the plan made at the read. Here a plan kept before the read is read as the page's plan.
+Area: the first edit's gesture (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstEditGestureTests
+Must go red: ResectaAppTests/FirstEditGestureTests theReaderReadsOnlyACurrentPlan
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/FirstEdit.swift b/Sources/ResectaApp/State/FirstEdit.swift
+index 32fed4f94..5efd7ea81 100644
+--- a/Sources/ResectaApp/State/FirstEdit.swift
++++ b/Sources/ResectaApp/State/FirstEdit.swift
+@@ -37,7 +37,7 @@ nonisolated enum FirstEdit {
+     /// page's words, so no start is read from it either.
+     static func currentPlan(kept: DrawnPlan?, pageVersion: Int,
+                             madeAtRead: () -> DrawnPlan?) -> DrawnPlan? {
+-        if let kept, !kept.madeWithoutRead, kept.pageVersion == pageVersion, kept.fromStoredRegions == true {
++        if let kept, kept.pageVersion == pageVersion, kept.fromStoredRegions == true {
+             return kept
+         }
+         return madeAtRead()
