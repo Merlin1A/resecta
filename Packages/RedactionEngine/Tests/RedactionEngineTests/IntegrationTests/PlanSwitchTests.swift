@@ -98,7 +98,8 @@ struct PlanSwitchTests {
     /// the page's picture).
     static func run(source: PlanSource, inputsFor: Set<Int>, uncheckable: Set<Int> = [],
                     bars: [CGRect] = bars, boxes: [Box] = boxes,
-                    dpi: Int = PlanSwitchTests.dpi, shownDPI: Int? = nil) async throws -> Run {
+                    dpi: Int = PlanSwitchTests.dpi, shownDPI: Int? = nil,
+                    limitAbove: CGFloat? = nil) async throws -> Run {
         let doc = try #require(PDFDocument(data: pdf(bars: bars)))
         defer { withExtendedLifetime(doc) {} }
         let page = try #require(doc.page(at: 0))
@@ -116,7 +117,8 @@ struct PlanSwitchTests {
                 drawn.append(RunRecord.DrawnRegion(region: region))
             }
             let r = rect64(box.rect)
-            planBoxes.append(PaintedBox(regionIDs: ids, inner: r, paint: r, tight: r, limitAbove: nil, limitBelow: nil,
+            planBoxes.append(PaintedBox(regionIDs: ids, inner: r, paint: r, tight: r,
+                                        limitAbove: limitAbove.map { Int($0 * 64) }, limitBelow: nil,
                                         exposure: GeometryPolicy.release.asPlaced.exposure, treatment: .notAsked,
                                         bandMade: false, inkEnlargedCovered: false, inkEnlargedToCap: false,
                                         asDrawn: false, inkCheckable: box.search && !uncheckable.contains(index)))
@@ -142,9 +144,9 @@ struct PlanSwitchTests {
 
     // MARK: - The source and the choice
 
-    @Test("The run's plan source is \"as placed\", and under it the user's switch is not read")
+    @Test("The run's plan source is the switch's policy, under which the user's switch is read; under \"as placed\" it is not")
     func sourceAndChoice() {
-        #expect(RunRecord.planSource == .asPlaced)
+        #expect(RunRecord.planSource == .switchPolicy)
         for (source, on, wantSource, wantOn) in [(PlanSource.asPlaced, true, PlanSource.asPlaced, false),
                                                  (.asPlaced, false, .asPlaced, false),
                                                  (.switchPolicy, true, .switchPolicy, true),
@@ -155,19 +157,20 @@ struct PlanSwitchTests {
         let doc = PDFDocument(data: Self.pdf())
         let page = doc?.page(at: 0)
         #expect(PDFPageData(page: page ?? PDFPage(), pageIndex: 0, regions: [], fillColor: .black, targetDPI: 300,
-                            pipelineMode: .secureRasterization, rotation: 0).planSource == .asPlaced)
+                            pipelineMode: .secureRasterization, rotation: 0).planSource == .switchPolicy)
     }
 
-    @Test("The record's page makes the same as-placed plan with the switch on or off")
+    @Test("Handed \"as placed\", the record's page makes the same plan with the switch on or off; under the run's source a box drawn by hand keeps those rectangles")
     func pageInitIgnoresTheSwitch() throws {
         let drawn = Self.boxes.flatMap(\.regions).map {
             RunRecord.DrawnRegion(id: UUID(), normalizedRect: Self.share($0), kind: .drawnByHand)
         }
         let size = CGSize(width: Self.width, height: Self.height)
-        let on = try #require(RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: size, rotation: 0,
-                                             switchOn: true).plan)
-        let off = try #require(RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: size, rotation: 0,
-                                              switchOn: false).plan)
+        func plan(_ on: Bool, _ source: PlanSource) throws -> PaintPlan {
+            try #require(RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: size, rotation: 0, switchOn: on,
+                                        read: nil, source: source).plan)
+        }
+        let on = try plan(true, .asPlaced), off = try plan(false, .asPlaced)
         let asPlaced = PaintPlan.asPlaced(
             regions: drawn.map { d in
                 let r = d.normalizedRect
@@ -178,6 +181,14 @@ struct PlanSwitchTests {
         #expect(on == off)
         #expect(on.boxes == asPlaced.boxes)
         #expect(on.boxes.allSatisfy { !$0.bandMade && !$0.inkEnlargedCovered && !$0.inkEnlargedToCap })
+        // Under the run's source a box drawn by hand is painted as drawn: the
+        // same rectangles, switch on or off, never judged.
+        for switchOn in [false, true] {
+            let run = try plan(switchOn, RunRecord.planSource)
+            #expect(run.boxes.map(\.paint) == asPlaced.boxes.map(\.paint))
+            #expect(run.boxes.map(\.inner) == asPlaced.boxes.map(\.inner))
+            #expect(run.boxes.allSatisfy { $0.asDrawn && !$0.inkCheckable && !$0.bandMade })
+        }
     }
 
     // MARK: - The check where growth runs
@@ -315,5 +326,88 @@ struct PlanSwitchTests {
             // this argument cannot see it. The paper's case as written.
             #expect(alone == painted, "the grids nest: the join changes nothing")
         }
+    }
+
+    /// One Search box at 36-58 pt across rows 38-50 pt, held above by a line
+    /// at its own top (a line whose letters reach into the box sets the limit
+    /// there), with ink inside it and a detached mark above it, rows 50.2 to
+    /// 53.2 pt. At 300 dpi the held edge is pixel 208, "as placed" starts its
+    /// growth at pixel 210 (the top rounded up, plus one), and the box's
+    /// block paints to 216: the mark's lowest row, 209, lies between the two
+    /// edges, so only growth from where "as placed" starts reaches it.
+    static let markAbove = [CGRect(x: 40, y: 40, width: 14, height: 8), CGRect(x: 44, y: 50.2, width: 4, height: 3)]
+
+    @Test("A box held by a limit above still paints its \"as placed\" growth: a detached mark above it is covered, judged or not",
+          arguments: [true, false])
+    func limitedSideKeepsTheAsPlacedGrowth(judged: Bool) async throws {
+        let box: Box = (CGRect(x: 36, y: 38, width: 22, height: 12), [CGRect(x: 36, y: 38, width: 22, height: 12)], true)
+        let held = try await Self.run(source: .switchPolicy, inputsFor: judged ? [0] : [], bars: Self.markAbove,
+                                      boxes: [box], limitAbove: 50)
+        let placed = try await Self.run(source: .asPlaced, inputsFor: [], bars: Self.markAbove, boxes: [box])
+        #expect((held.result.inkVerdicts[0] != .indeterminate) == judged, "\(held.result.inkVerdicts)")
+        let a = try placed.reported(0)
+        #expect(a.maxY > (try placed.projection(0)).maxY, "growth at \"as placed\" reaches the mark: \(a)")
+        #expect(held.bitmap.misses(a, level: 0) == 0, "the pixels \"as placed\" fills are filled with the limit too")
+    }
+
+    /// One Search region at 36-58 pt from 20 pt to 30.470703125 pt, a top
+    /// that is no whole sixty-fourth: its own "as placed" box rounds it up to
+    /// 1951/64 pt, 127.02 px at 300 dpi, so today's paint reaches row 129
+    /// (that edge, plus one) while the region's fill stops at 128. Its box
+    /// holds that rectangle and is held above at its own top, 1951/64 pt:
+    /// the margin is held at row 127 and the block line is 128, so the box
+    /// alone paints to 128 and leaves row 128, which today paints. A bar
+    /// 0.18 pt tall lies in that row, touching neither 127 nor 129, so no
+    /// growth reaches it; ink inside the box below.
+    static let roundedTop: CGFloat = 1950.125 / 64
+    static let barInTheRow = [CGRect(x: 40, y: 22, width: 14, height: 6), CGRect(x: 44, y: 30.75, width: 4, height: 0.18)]
+
+    @Test("A box held at a top today's paint rounds up past a pixel line still paints every pixel today paints, judged or not",
+          arguments: [true, false])
+    func limitedSideKeepsTodaysPaintedRow(judged: Bool) async throws {
+        let region = CGRect(x: 36, y: 20, width: 22, height: Self.roundedTop - 20)
+        let held64: CGFloat = 1951 / 64
+        let box: Box = (CGRect(x: 36, y: 20, width: 22, height: held64 - 20), [region], true)
+        let held = try await Self.run(source: .switchPolicy, inputsFor: judged ? [0] : [], bars: Self.barInTheRow,
+                                      boxes: [box], limitAbove: held64)
+        let placed = try await Self.run(source: .asPlaced, inputsFor: [], bars: Self.barInTheRow, boxes: [box])
+        #expect((held.result.inkVerdicts[0] != .indeterminate) == judged, "\(held.result.inkVerdicts)")
+        let a = try placed.reported(0)
+        #expect(a.maxY == 129, "today's paint reaches row 129: \(a)")
+        // The box alone, held at its top, stops a row short of today's paint.
+        #expect((try held.projection(0)).maxY == 128, "precondition: the held box alone paints to 128")
+        #expect(held.bitmap.misses(a, level: 0) == 0, "the pixels today fills are filled with the limit too")
+        #expect(held.bitmap.misses(PixelPlan.PixelRect(minX: 183, minY: 128, maxX: 200, maxY: 129), level: 0) == 0,
+                "the bar in row 128 is covered")
+    }
+
+    @Test("A judged box keeps today's growth in its floor until the differential count passes")
+    func judgedBoxKeepsGrowthForNow() {
+        #expect(PageRasterizer.judgedBoxKeepsGrowth)
+    }
+
+    // MARK: - The record carries the verdicts
+
+    @Test("The record carries each judged box's verdict, and a box the check widened or whose ink ran past the cap is in its list",
+          arguments: judgedPages.map(\.verdict))
+    func recordCarriesTheVerdicts(verdict: InkCheck.Verdict) async throws {
+        let ink = try #require(Self.judgedPages.first { $0.verdict == verdict }).ink
+        let box: Box = (CGRect(x: 36, y: 38, width: 22, height: 12), [CGRect(x: 36, y: 38, width: 22, height: 12)], true)
+        let judged = try await Self.run(source: .switchPolicy, inputsFor: [0], bars: ink, boxes: [box])
+        var produced = RunRecord.Produced()
+        produced.record(judged.result, pageIndex: 3)
+        let position = RunRecord.BoxPosition(pageIndex: 3, box: 0)
+        #expect(produced.inkVerdicts == [position: verdict])
+        #expect(produced.boxesWidenedForInk == (verdict == .escaped ? [position] : []))
+        #expect(produced.boxesWithInkPastTheCap == (verdict == .pastCap ? [position] : []))
+    }
+
+    @Test("At \"as placed\" the record carries no verdict and both lists are empty")
+    func recordCarriesNoVerdictAsPlaced() async throws {
+        let placed = try await Self.run(source: .asPlaced, inputsFor: [0, 1, 2])
+        var produced = RunRecord.Produced()
+        produced.record(placed.result, pageIndex: 0)
+        #expect(produced.inkVerdicts.isEmpty)
+        #expect(produced.boxesWidenedForInk.isEmpty && produced.boxesWithInkPastTheCap.isEmpty)
     }
 }

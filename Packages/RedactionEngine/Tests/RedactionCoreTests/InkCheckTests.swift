@@ -380,4 +380,29 @@ struct InkCheckApplyingTests {
         let labels = Mirror(reflecting: InkCheck.Result(verdict: .clear)).children.compactMap(\.label)
         #expect(labels == ["verdict", "growth"])
     }
+
+    // MARK: - The default band's net
+
+    @Test("The net reads ink only in the band's pixels its line margin does not hold", arguments: dpis)
+    func netReadsTheSlot(dpi: Int) {
+        var p = Picture(dpi: dpi)
+        let band = InkCheck.pixels(enclosing: rect(40, 40, 140, 52), raster: p.raster)
+        let margin = InkCheck.pixels(enclosing: rect(40, 40, 80, 52), raster: p.raster)
+        #expect(!InkCheck.inkInSlot(band: band, lineMargin: margin, grid: p.grid, raster: p.raster), "a blank slot")
+        p.fill(rect(50, 43, 70, 49))
+        #expect(!InkCheck.inkInSlot(band: band, lineMargin: margin, grid: p.grid, raster: p.raster),
+                "ink inside the line margin is the box's own")
+        p.fill(rect(110, 44, 112, 48))
+        #expect(InkCheck.inkInSlot(band: band, lineMargin: margin, grid: p.grid, raster: p.raster), "a mark in the slot")
+    }
+
+    @Test("Where the paper around the band cannot be read the net withdraws the band")
+    func netWithdrawsOnTexture() {
+        var p = Picture(dpi: 150)
+        for y in 0..<p.height { for x in 0..<p.width where (x + y) % 2 == 0 { p.values[y * p.width + x] = 0 } }
+        let band = InkCheck.pixels(enclosing: rect(40, 40, 140, 52), raster: p.raster)
+        let margin = InkCheck.pixels(enclosing: rect(40, 40, 80, 52), raster: p.raster)
+        #expect(InkCheck.inkInSlot(band: band, lineMargin: margin, grid: p.grid, raster: p.raster))
+    }
+
 }

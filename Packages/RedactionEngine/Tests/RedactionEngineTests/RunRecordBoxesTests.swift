@@ -10,6 +10,8 @@ import Testing
 // rasterised. The capture's half (the page data carries these boxes) is in
 // the app's tests.
 
+// The record's maker is handed "as placed" here; the run's own source is the
+// switch's policy (PlanSwitchTests).
 @Suite("The run's record: boxes as placed")
 struct RunRecordBoxesTests {
 
@@ -23,7 +25,8 @@ struct RunRecordBoxesTests {
     }
 
     static func plan(_ regions: [RunRecord.DrawnRegion], cropBox: CGSize = letter, rotation: Int = 0) throws -> PaintPlan {
-        try #require(RunRecord.Page(pageIndex: 0, regions: regions, cropBox: cropBox, rotation: rotation, switchOn: false).plan)
+        try #require(RunRecord.Page(pageIndex: 0, regions: regions, cropBox: cropBox, rotation: rotation, switchOn: false,
+                                    read: nil, source: .asPlaced).plan)
     }
 
     /// Each case, with what it builds and expects.

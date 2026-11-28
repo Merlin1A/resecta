@@ -1,0 +1,19 @@
+Property: The editor's kept plan is made with the page's read the run's entry hands the same maker, so the two make the same plan.
+Area: the editor's kept plan (DrawnPlan.init)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter SwitchThroughTheRecordTests
+Must go red: RedactionEngineTests/SwitchThroughTheRecordTests keptPlanIsTheRecordsPlan
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+index be98933..3626378 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+@@ -94,7 +94,7 @@ public struct DrawnPlan: Equatable, Sendable {
+     package init(pageIndex: Int, regions: [RedactionRegion], cropBox: CGSize, rotation: Int,
+                  switchOn: Bool, exportDPI: Int, fillColor: FillColor, read: RunRecord.PageRead?, source: PlanSource) {
+         let plan = RunRecord.Page.makePlan(regions: regions.map(RunRecord.DrawnRegion.init(region:)),
+-                                           cropBox: cropBox, rotation: rotation, switchOn: switchOn, read: read,
++                                           cropBox: cropBox, rotation: rotation, switchOn: switchOn, read: nil,
+                                            source: source)
+         self.init(pageIndex: pageIndex, switchOn: switchOn, exportDPI: exportDPI, fillColor: fillColor, plan: plan,
+                   filledPixels: Self.filledPixels(regions: regions, cropBox: cropBox, rotation: rotation,

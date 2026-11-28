@@ -1,0 +1,19 @@
+Property: Until the differential count passes, a box the ink check judges keeps today's growth in its floor, so it never paints less than at "as placed".
+Area: the plan path's floor (PageRasterizer.paintPlan)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanSwitchTests
+Must go red: RedactionEngineTests/PlanSwitchTests judgedBoxKeepsTheAsPlacedPaint; RedactionEngineTests/PlanSwitchTests judgedBoxKeepsGrowthForNow
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index 1c06275b..51e40a82 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -226,7 +226,7 @@ extension PageRasterizer {
+     /// ink pixels the check's paint leaves unfilled that growth fills, read
+     /// from a render of that word alone, at 150 and 300 dpi, must be zero.
+     /// Only then may a judged box drop growth.
+-    static let judgedBoxKeepsGrowth = true
++    static let judgedBoxKeepsGrowth = false
+ 
+     /// The plan's boxes painted, with any region no box
+     /// holds painted on its own as the region path paints it. In this

@@ -56,6 +56,17 @@ package struct PlanFacts: Hashable, Sendable {
     package var fellBack = 0
     /// The page's unselected words whose box shares area with a box's paint.
     package var unselectedWordsInsidePaint = 0
+    /// What the ink check reads, for each box it may judge (`inkCheckable`),
+    /// by the box's place in the plan: the height of the box's line of
+    /// text, the tallest line its rows lie on, in sixty-fourths.
+    package var inkLineHeights: [Int: Int] = [:]
+    /// The boxes of the page's words that no box selects or covers, in
+    /// whole sixty-fourths: the ink check's flood never enters them.
+    package var otherWords: [PageRect64] = []
+    /// For each box painted with its default band, by its place in the plan:
+    /// the same box with its line margin, which the producer paints instead
+    /// when the page's picture shows ink in the band's slot.
+    package var defaultFallbacks: [Int: PaintedBox] = [:]
 
     package init() {}
 }
@@ -137,6 +148,11 @@ private struct Maker {
     struct Made {
         var box: PaintedBox
         var regions: [Int]
+        /// The tallest line the box's rows lie on, when it has any.
+        var lineHeight: Int? = nil
+        /// A box painted with its default band: the same box with its line
+        /// margin.
+        var fallback: PaintedBox? = nil
     }
 
     init(placed: [(region: PlanRegion, rect: PageRect64)], words: PageWords, text: String, pageFacts: PageTextFacts,
@@ -151,8 +167,17 @@ private struct Maker {
         self.switchOn = switchOn
         // Every anchored region's characters are selected when the page's
         // complement is made, so no box's own text is read as a neighbour.
-        let selected = placed.reduce(into: Set<Int>()) { set, p in
+        // A letter whose box lies wholly inside any placed region's
+        // rectangle, of any kind, is painted already and leaves the
+        // complement too; a letter only partly inside stays.
+        var selected = placed.reduce(into: Set<Int>()) { set, p in
             if p.region.kind == .placedFromTextAnchored { set.formUnion(p.region.selected) }
+        }
+        for word in words.words {
+            for letter in word.letterBoxes where !selected.contains(letter.offset) {
+                guard let box = PageRect64(outward: letter.rect) else { continue }
+                if placed.contains(where: { $0.rect.contains(box) }) { selected.insert(letter.offset) }
+            }
         }
         complement = Complement.page(words: words, text: text, selected: selected, constants: policy.provisional)
     }
@@ -198,9 +223,25 @@ private struct Maker {
         func root(_ i: Int) -> Int { var i = i; while parent[i] != i { i = parent[i] }; return i }
         let joinable = placed.indices.filter(readsALayout)
         let rows = Dictionary(uniqueKeysWithValues: joinable.map { ($0, selectedRows(placed[$0].region.selected)) })
+        let tights = Dictionary(uniqueKeysWithValues: joinable.map { i in
+            (i, letterRects(placed[i].region.selected).reduce(placed[i].rect) { $0.union($1) })
+        })
+        let others = complement.lines.flatMap { $0.words.flatMap(\.letters) }.map(\.rect)
+        // The join guard: regions join only when their joined tight rectangle
+        // holds the middle of no unselected letter that no member's own tight
+        // rectangle holds. Each pair is guarded, then each group once; a group
+        // that fails is split into single regions.
+        func guarded(_ group: [Int]) -> Bool {
+            let own = group.compactMap { tights[$0] }
+            guard let first = own.first else { return true }
+            let joined = own.dropFirst().reduce(first) { $0.union($1) }
+            return !others.contains { letter in
+                Self.holdsMiddle(joined, letter) && !own.contains { Self.holdsMiddle($0, letter) }
+            }
+        }
         for (k, a) in joinable.enumerated() {
             for b in joinable[(k + 1)...] where root(a) != root(b) {
-                if adjoin(rows[a] ?? [], rows[b] ?? []) { parent[root(b)] = root(a) }
+                if adjoin(rows[a] ?? [], rows[b] ?? []) && guarded([a, b]) { parent[root(b)] = root(a) }
             }
         }
         var order: [Int] = []
@@ -210,7 +251,17 @@ private struct Maker {
             if members[r] == nil { order.append(r) }
             members[r, default: []].append(i)
         }
-        return order.map { members[$0]! }
+        return order.flatMap { r -> [[Int]] in
+            let group = members[r]!
+            return group.count > 1 && !guarded(group) ? group.map { [$0] } : [group]
+        }
+    }
+
+    /// Whether the middle of `letter` lies inside `rect`, edges included,
+    /// kept whole as twice the middle against twice the sides.
+    static func holdsMiddle(_ rect: PageRect64, _ letter: PageRect64) -> Bool {
+        let x = letter.minX + letter.maxX, y = letter.minY + letter.maxY
+        return 2 * rect.minX <= x && x <= 2 * rect.maxX && 2 * rect.minY <= y && y <= 2 * rect.maxY
     }
 
     /// A set of selected letters' rows, each as one rectangle.
@@ -287,7 +338,7 @@ private struct Maker {
                                  inkCheckable: anchored && !asDrawn
                                      && (lineReading == .column || lineReading == .noColumn),
                                  defaultWidth: width),
-                 regions: group)
+                 regions: group, lineHeight: (read?.rows ?? []).map { self.lineHeight($0) }.max())
         }
         let outcome: SwitchTreatment = switch rule.outcome {
         case .notAsked: .notAsked
@@ -311,9 +362,17 @@ private struct Maker {
             return box(inner: tight, paint: margin.paint, tight: tight, above: margin.above, below: margin.below,
                        treatment: outcome, band: false, asDrawn: false)
         case .defaultBand:
-            let made = defaultPaint(tight: tight, rows: read?.rows ?? [], regions: regions.map(\.rect), letters: letters)
-            return box(inner: made.inner, paint: made.paint, tight: tight, above: made.above, below: made.below,
-                       treatment: outcome, band: made.inner != tight, asDrawn: false, width: made.width)
+            let rows = read?.rows ?? []
+            let made = defaultPaint(tight: tight, rows: rows, regions: regions.map(\.rect), letters: letters)
+            var result = box(inner: made.inner, paint: made.paint, tight: tight, above: made.above, below: made.below,
+                             treatment: outcome, band: made.inner != tight, asDrawn: false, width: made.width)
+            if made.width == .taken && made.inner != tight {
+                let margin = marginPaint(inner: tight, rows: rows)
+                result.fallback = box(inner: tight, paint: margin.paint, tight: tight, above: margin.above,
+                                      below: margin.below, treatment: outcome, band: false, asDrawn: false,
+                                      width: .notTaken(.inkInSlot)).box
+            }
+            return result
         case .band:
             let rows = read?.rows ?? []
             let band = self.band(tight: tight, rows: rows)
@@ -420,7 +479,24 @@ private struct Maker {
         let wordInBand = complement.lines.contains { $0.words.contains { $0.box.sharesArea(with: band) } }
         let drawnInPaint = drawing.objects.contains { $0.sharesArea(with: on.paint) }
         guard !wordInBand && !drawnInPaint else { return lineMargin(.notTaken(.wordOrDrawingInBand)) }
-        return (band, on.paint, on.above, on.below, .taken)
+        // Never less than the line margin: the band's paint is taken with
+        // the line margin's, and each limit is the looser of the two (none
+        // is looser than any), so the box's pixels hold the line margin's
+        // wherever the band's start or a closer neighbour stops its own.
+        return (band, on.paint.union(margin.paint), Self.looserAbove(on.above, margin.above),
+                Self.looserBelow(on.below, margin.below), .taken)
+    }
+
+    /// The looser of two limits above a box: the higher, or none if either is none.
+    static func looserAbove(_ a: Int?, _ b: Int?) -> Int? {
+        guard let a, let b else { return nil }
+        return Swift.max(a, b)
+    }
+
+    /// The looser of two limits below a box: the lower, or none if either is none.
+    static func looserBelow(_ a: Int?, _ b: Int?) -> Int? {
+        guard let a, let b else { return nil }
+        return Swift.min(a, b)
     }
 
     /// The default band: on each line, the column and the tight rectangle
@@ -479,19 +555,21 @@ private struct Maker {
         if let next { sides.end = Swift.min(sides.end, Swift.max(0, (next - inner.maxX) / 2)) }
         var paint = inner.outset(top: sides.top, bottom: sides.bottom, left: sides.start, right: sides.end)
 
+        // A neighbour above has its middle above inner's top, one below has
+        // its middle below inner's bottom: a line inside inner that carries
+        // none of the box's rows is no neighbour and limits neither margin.
         let own = Set(rows.compactMap(\.line))
-        let middle2 = inner.minY + inner.maxY
         var above: Int?
         var below: Int?
         let neighbours = complement.lines.indices.filter { !own.contains($0) && complement.lines[$0].box.overlapsAlongLine(paint) }
-        if let n = neighbours.filter({ complement.lines[$0].box.minY + complement.lines[$0].box.maxY > middle2 })
+        if let n = neighbours.filter({ complement.lines[$0].box.minY + complement.lines[$0].box.maxY > 2 * inner.maxY })
             .min(by: { complement.lines[$0].box.minY < complement.lines[$1].box.minY }) {
             let line = complement.lines[n]
             let limit = Swift.max(line.box.minY + policy.margin.entry(letterSize: Self.letterSize(line)), inner.maxY)
             above = limit
             paint.maxY = Swift.min(paint.maxY, limit)
         }
-        if let n = neighbours.filter({ complement.lines[$0].box.minY + complement.lines[$0].box.maxY < middle2 })
+        if let n = neighbours.filter({ complement.lines[$0].box.minY + complement.lines[$0].box.maxY < 2 * inner.minY })
             .max(by: { complement.lines[$0].box.maxY < complement.lines[$1].box.maxY }) {
             let line = complement.lines[n]
             let limit = Swift.min(line.box.maxY - policy.margin.entry(letterSize: Self.letterSize(line)), inner.minY)
@@ -528,6 +606,13 @@ private struct Maker {
         facts.unselectedWordsInsidePaint = complement.lines.reduce(0) { sum, line in
             sum + line.words.filter { word in paints.contains { $0.sharesArea(with: word.box) } }.count
         }
+        for (index, m) in made.enumerated() where m.box.inkCheckable {
+            if let h = m.lineHeight { facts.inkLineHeights[index] = h }
+        }
+        for (index, m) in made.enumerated() {
+            if let fallback = m.fallback { facts.defaultFallbacks[index] = fallback }
+        }
+        facts.otherWords = complement.lines.flatMap { $0.words.map(\.box) }
         return facts
     }
 }

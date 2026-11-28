@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/BoxCheckOutsidePlanTests "Each region painted 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
-index 950ac094..42d2a670 100644
+index 8f56d73..5fedb72 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
-@@ -44,7 +44,7 @@ extension BoxCheckInput {
-             let drawn = page.regions.map(\.id).filter { named.contains($0) }
-             let rest = named.subtracting(drawn).sorted { $0.uuidString < $1.uuidString }
+@@ -53,7 +53,7 @@ extension BoxCheckInput {
+                 }
+             }
              pages.append(Page(widthSixtyFourths: plan.widthSixtyFourths, heightSixtyFourths: plan.heightSixtyFourths,
--                              boxes: plan.boxes, reported: reported, outsidePlan: drawn + rest))
-+                              boxes: plan.boxes, reported: reported))
+-                              boxes: boxes, reported: reported, outsidePlan: drawn + rest))
++                              boxes: boxes, reported: reported))
          }
          var digests: [Data] = []
          while let d = record.produced.pageImageDigests[digests.count] { digests.append(d) }
