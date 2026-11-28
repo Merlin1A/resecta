@@ -249,7 +249,7 @@ struct PipelineCoordinatorTests {
     /// off-MainActor invariant is mostly compile-time-enforced (`nonisolated`),
     /// so the practical surface for this suite is "the helper exists,
     /// succeeds on a valid file, and throws the expected
-    /// `PipelineError.verificationError(.engineCrash(layerIndex: 0))` on a
+    /// `PipelineError.verificationError(.engineCrash(check: nil))` on a
     /// missing or unreadable file."
     @Test("loadOutputDocumentOffMainActor returns a wrapped document for a valid PDF URL")
     func loadOutputDocumentSucceeds() async throws {
@@ -272,7 +272,7 @@ struct PipelineCoordinatorTests {
         }
     }
 
-    @Test("loadOutputDocumentOffMainActor maps parse failure to verificationError.engineCrash(0)")
+    @Test("loadOutputDocumentOffMainActor maps parse failure to verificationError.engineCrash naming no check")
     func loadOutputDocumentErrorShape() async throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("ki4-pkg-f-bad-\(UUID().uuidString).pdf")
@@ -285,8 +285,8 @@ struct PipelineCoordinatorTests {
             }.value
             Issue.record("expected throw")
         } catch let error as PipelineError { // LegalPhrases:safe (Swift keyword)
-            if case .verificationError(.engineCrash(let layer)) = error {
-                #expect(layer == 0)
+            if case .verificationError(.engineCrash(let check)) = error {
+                #expect(check == nil)
             } else {
                 Issue.record("unexpected PipelineError case: \(error)")
             }

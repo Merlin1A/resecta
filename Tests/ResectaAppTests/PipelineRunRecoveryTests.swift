@@ -76,14 +76,14 @@ struct PipelineRunRecoveryTests {
         }
     }
 
-    @Test("Full run failing in the verification stage: keep the output, land on .failed → verified(skipped: error), an untyped error reads as engineCrash(0)")
+    @Test("Full run failing in the verification stage: keep the output, land on .failed → verified(skipped: error), an untyped error reads as engineCrash naming no check")
     func fullVerificationStageError() {
         guard case .failed(let error, let returnPhase, clearOutput: false) = PipelineCoordinator.recovery(
             for: full, after: .failed(Boom(), stage: .verification), phaseKind: .verifying) else {
             Issue.record("expected failed(clearOutput: false)"); return
         }
-        guard case .verificationError(.engineCrash(layerIndex: 0)) = error else {
-            Issue.record("expected verificationError(.engineCrash(0)), got \(error)"); return
+        guard case .verificationError(.engineCrash(check: nil)) = error else {
+            Issue.record("expected verificationError(.engineCrash(check: nil)), got \(error)"); return
         }
         guard case .verified(let report) = returnPhase, report.layers.isEmpty else {
             Issue.record("expected returnPhase .verified(.skipped(reason: .error))"); return
@@ -109,8 +109,8 @@ struct PipelineRunRecoveryTests {
                 for: verifyOnly, after: .failed(Boom(), stage: stage), phaseKind: .verifying) else {
                 Issue.record("expected failed(clearOutput: false) for stage \(stage)"); return
             }
-            guard case .verificationError(.engineCrash(layerIndex: 0)) = error else {
-                Issue.record("expected engineCrash(0), got \(error)"); return
+            guard case .verificationError(.engineCrash(check: nil)) = error else {
+                Issue.record("expected engineCrash naming no check, got \(error)"); return
             }
             guard case .verified = returnPhase else {
                 Issue.record("expected returnPhase .verified"); return

@@ -54,7 +54,7 @@ struct ErrorRecoveryTests {
     func failedFromVerificationRecoverableToVerified() {
         let doc = DocumentState()
         doc.phase = .failed(
-            error: .verificationError(.engineCrash(layerIndex: 2)),
+            error: .verificationError(.engineCrash(check: .binaryStringSearch)),
             returnPhase: .verified(report: .skipped))
 
         let success = doc.transition(to: .verified(report: .skipped))
@@ -90,7 +90,7 @@ struct ErrorRecoveryTests {
         // Simulate what PipelineCoordinator does on verification error (lines 93-98)
         // Output URL is NOT cleared — redacted document is valid
         doc.phase = .failed(
-            error: .verificationError(.engineCrash(layerIndex: 0)),
+            error: .verificationError(.engineCrash(check: nil)),
             returnPhase: .verified(report: .skipped))
 
         #expect(redaction.outputURL == outputURL,
@@ -185,9 +185,82 @@ struct ErrorRecoveryTests {
 
     @Test("All PipelineError verification cases have non-empty localizedDescription",
           arguments: [
-            PipelineError.verificationError(.engineCrash(layerIndex: 0)),
+            PipelineError.verificationError(.engineCrash(check: nil)),
           ])
     func verificationErrorDescriptions(error: PipelineError) {
         #expect(!error.localizedDescription.isEmpty)
+    }
+
+    // MARK: The failure card after verification
+
+    static let cardTail = " could not finish, so this PDF has no verification result. Run Verification again, or share it without verification."
+
+    @Test("The failure card names the check that could not finish, for a Secure and a Searchable check")
+    func failureCardNamesTheCheck() {
+        let secure = VerificationEngine().layers(for: .secureRasterization)
+        let searchable = VerificationEngine().layers(for: .searchableRedaction)
+        #expect(secure.contains(.ocrCheck))
+        #expect(searchable.contains(.characterLineage))
+        #expect(PipelineError.verificationError(.engineCrash(check: .ocrCheck)).localizedRecovery
+            == "Text Recognition of Each Page could not finish, so this PDF has no verification result. Run Verification again, or share it without verification.")
+        #expect(PipelineError.verificationError(.engineCrash(check: .characterLineage)).localizedRecovery
+            == "Kept Text Unchanged could not finish, so this PDF has no verification result. Run Verification again, or share it without verification.")
+        for check in secure + searchable {
+            let error = PipelineError.verificationError(.engineCrash(check: check))
+            #expect(error.localizedRecovery == VerificationRowModel.title(for: check) + Self.cardTail, "\(check)")
+            #expect(error.localizedTitle == "Verification Could Not Complete")
+        }
+    }
+
+    @Test("The failure card with no check named names none")
+    func failureCardNamesNoCheck() {
+        let error = PipelineError.verificationError(.engineCrash(check: nil))
+        #expect(error.localizedRecovery
+            == "Verification could not finish, so this PDF has no verification result. Run Verification again, or share it without verification.")
+        #expect(error.localizedTitle == "Verification Could Not Complete")
+        for check in VerificationLayer.allCases {
+            #expect(!error.localizedRecovery.contains(VerificationRowModel.title(for: check)), "\(check)")
+        }
+    }
+
+    /// Every place the app and the engine build the verification error names
+    /// no check, except the one where a scheduled check stored no result,
+    /// which names that check: a failure that is not a check's (no pages, an
+    /// output that does not load, an error from elsewhere) never reads a
+    /// check's title on the card.
+    @Test("Only a scheduled check's missing result names a check")
+    func onlyAMissingResultNamesACheck() throws {
+        let root = URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+        var named: [String: [String]] = [:]
+        var files = 0
+        for dir in ["Sources/ResectaApp", "Packages/RedactionEngine/Sources/RedactionEngine"] {
+            let base = root.appendingPathComponent(dir)
+            let paths = try #require(FileManager.default.enumerator(atPath: base.path))
+                .compactMap { $0 as? String }
+                .filter { $0.hasSuffix(".swift") }
+                .sorted()
+            files += paths.count
+            for path in paths {
+                let text = try String(contentsOf: base.appendingPathComponent(path), encoding: .utf8)
+                for line in text.components(separatedBy: "\n")
+                where !line.trimmingCharacters(in: .whitespaces).hasPrefix("//") {
+                    for piece in line.components(separatedBy: ".engineCrash(check:").dropFirst() {
+                        let value = piece.prefix { $0 != ")" }.trimmingCharacters(in: .whitespaces)
+                        named[(path as NSString).lastPathComponent, default: []].append(value)
+                    }
+                }
+            }
+        }
+        #expect(files > 200, "the source trees were not found")
+        #expect(named == [
+            "VerificationOrchestrator.swift": ["nil", "layer"],
+            "PipelineRunSupport.swift": ["nil"],
+            "PipelineRunner.swift": ["nil"],
+            "PipelineCoordinator.swift": ["nil", "nil"],
+            "ResectaApp.swift": ["nil"],
+        ])
     }
 }

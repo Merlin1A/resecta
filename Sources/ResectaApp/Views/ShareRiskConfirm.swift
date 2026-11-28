@@ -207,11 +207,17 @@ extension DocumentEditorView {
         return "\(title): could not verify\(location)"
     }
 
-    /// Skip-fact line for the SKIPPED confirm family; the sheet draws the
-    /// choices as the slide control + Go back, so this line names only
-    /// the fact.
-    static let shareRiskConfirmSkipFactLine =
-        "Verification did not run on this PDF."
+    /// Skip-fact line for the SKIPPED confirm family, by why the report was
+    /// skipped; the sheet draws the choices as the slide control + Go back,
+    /// so this line names only the fact. No default: a new reason does not
+    /// build until it has its line.
+    static func shareRiskConfirmSkipFactLine(reason: VerificationReport.SkipReason) -> String {
+        switch reason {
+        case .autoVerifyOff: "Verification did not run on this PDF."
+        case .error: "Verification could not finish on this PDF."
+        case .cancelled: "Verification stopped early on this PDF."
+        }
+    }
 
     /// Deselected-items fact line for the confirm sheet — the results
     /// screen's own deselection line, verbatim.
@@ -486,8 +492,8 @@ struct ShareRiskConfirmSheet: View {
                     switch kind {
                     case .failOrAttention:
                         itemList
-                    case .skipped:
-                        Text(DocumentEditorView.shareRiskConfirmSkipFactLine)
+                    case .skipped(let report):
+                        Text(DocumentEditorView.shareRiskConfirmSkipFactLine(reason: report.skipReason))
                             .font(.subheadline)
                     case .incompleteWarn:
                         // The checks that did not run in full, listed —
