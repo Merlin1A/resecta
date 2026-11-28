@@ -411,6 +411,7 @@ enum VerificationDebugFixtures {
             previewAvailable: true, onExport: {}, onRunVerification: {})
             .environment(DocumentState())
             .environment(RedactionState())
+            .environment(ToastQueueManager())
     }
 }
 

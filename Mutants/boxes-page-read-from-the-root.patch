@@ -1,0 +1,18 @@
+Property: The bundled page is compared with the file in Resources, where it is kept.
+Area: the bundled page and its source
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/LegalDocumentBundleTests
+Must go red: ResectaAppTests/LegalDocumentBundleTests bundledCopyMatchesRepoRoot
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/LegalDocumentView.swift b/Sources/ResectaApp/Views/LegalDocumentView.swift
+--- a/Sources/ResectaApp/Views/LegalDocumentView.swift
++++ b/Sources/ResectaApp/Views/LegalDocumentView.swift
+@@ -47,7 +47,7 @@ enum LegalDocument: String, Identifiable, CaseIterable {
+     /// Where the file sits in the repository: the root for the three legal
+     /// files, the app's Resources folder for What Boxes Can Show.
+     var sourcePath: String {
+-        self == .whatBoxesCanShow ? "Resources/\(fileName)" : fileName
++        fileName
+     }
+ 
+     /// Navigation title — shares the gate link-label string so the sheet the

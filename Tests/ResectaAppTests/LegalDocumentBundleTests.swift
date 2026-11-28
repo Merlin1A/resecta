@@ -13,7 +13,9 @@ import Foundation
 // test (app bundle + #filePath repo root), so the identity check is a direct
 // byte compare, not a shared-SHA convention. A drift between what a user
 // reads at the gate and what resecta.app publishes is a legal-surface bug;
-// this suite is the tripwire.
+// this suite is the tripwire. What Boxes Can Show is bundled the same way
+// from Resources/ (in-app words, not a published document), and is compared
+// with that file.
 @Suite("Gate legal-document bundling")
 struct LegalDocumentBundleTests {
 
@@ -32,7 +34,7 @@ struct LegalDocumentBundleTests {
         )
     }
 
-    @Test("Bundled bytes match the repo-root source", arguments: documents)
+    @Test("Bundled bytes match the repository's file", arguments: documents)
     func bundledCopyMatchesRepoRoot(document: LegalDocument) throws {
         let bundledURL = try #require(
             appBundle.url(forResource: document.resourceName, withExtension: document.fileExtension),
@@ -42,13 +44,13 @@ struct LegalDocumentBundleTests {
             .deletingLastPathComponent()   // Tests/ResectaAppTests
             .deletingLastPathComponent()   // Tests
             .deletingLastPathComponent()   // <repo root>
-        let repoURL = repoRoot.appendingPathComponent(document.fileName)
+        let repoURL = repoRoot.appendingPathComponent(document.sourcePath)
 
         let bundled = try Data(contentsOf: bundledURL)
         let source = try Data(contentsOf: repoURL)
         #expect(
             bundled == source,
-            "app-bundle \(document.fileName) differs from the repo-root file — the gate would show a user text that is not the published \(document.resourceName).md (stale build? rebuild after editing legal docs)"
+            "app-bundle \(document.fileName) differs from \(document.sourcePath) — the app would show a user text that is not the file in the repository (stale build? rebuild after editing the page)"
         )
     }
 }

@@ -1032,3 +1032,11 @@ with its reason and the mutant that is caught in its place.
 | `share-skip-line-error-reads-did-not-run.patch` | The skipped share confirm says verification could not finish when the report was skipped by an error, not that it did not run. | ResectaAppTests/ShareRiskConfirmSkipLineTests skipFactLineNamesTheReason |
 | `share-skip-line-cancelled-reads-could-not-finish.patch` | The skipped share confirm says verification stopped early when it was cancelled, not that it could not finish. | ResectaAppTests/ShareRiskConfirmSkipLineTests skipFactLineNamesTheReason |
 | `verification-missing-result-names-no-check.patch` | A scheduled check that stored no result ends the run with the error naming that check. | RedactionEngineTests/UnfinishedRunTests eachCase [a scheduled check that stored no result ends the run naming that check, and the report is built in two places only]; ResectaAppTests/ErrorRecoveryTests onlyAMissingResultNamesACheck |
+| `boxes-page-switch-paragraph-drifts.patch` | The page's section on the switch reads as the Settings footer does, sentence for sentence. | ResectaAppTests/WhatBoxesCanShowPageTests switchParagraph |
+| `boxes-page-marker-drawn.patch` | The lint marker on the page's one marked line is never drawn. | ResectaAppTests/WhatBoxesCanShowPageTests markerNeverDrawn |
+| `boxes-page-read-from-the-root.patch` | The bundled page is compared with the file in Resources, where it is kept. | ResectaAppTests/LegalDocumentBundleTests bundledCopyMatchesRepoRoot |
+| `boxes-line-without-its-door.patch` | The boxes line opens to its link row to What Boxes Can Show. | ResectaAppTests/FactRowTests boxesLineOpensThePage |
+| `boxes-door-without-its-hint.patch` | The link row to What Boxes Can Show carries its spoken hint. | ResectaAppTests/FactRowTests boxesLineOpensThePage |
+| `boxes-door-line-never-set.patch` | The door line is the boxes line whenever the run burned a box. | ResectaAppTests/FactRowTests doorLineIsTheBoxesLine |
+| `boxes-page-settings-row-opens-nothing.patch` | The Settings row What Boxes Can Show opens the page. | ResectaAppUITests/SettingsInAppPagesUITests testWhatBoxesCanShowOpensFromRedactionBoxes |
+| `boxes-page-results-door-opens-nothing.patch` | The boxes line's link row opens the page. | ResectaAppUITests/SeededStatesUITests testBoxesLineOpensWhatBoxesCanShow |

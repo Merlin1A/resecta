@@ -58,7 +58,11 @@ struct VerificationResultsView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    @Environment(ToastQueueManager.self) private var toastManager
+
     @State private var previewPage: PreviewPage?
+    /// What Boxes Can Show, while the boxes line's link row has opened it.
+    @State private var presentedPage: LegalDocument?
     /// The findings the checks cannot see (`ResultsFindings`), derived when
     /// the screen appears and again when the boxes change.
     @State private var findings: [ResultsFinding] = []
@@ -104,14 +108,17 @@ struct VerificationResultsView: View {
                         }
                         VerificationDetailsSection(
                             report: report, deselectionSnapshot: deselectionSnapshot,
-                            runFactsLines: runFactsLines, previewAvailable: previewAvailable,
+                            runFactsLines: runFactsLines,
+                            runFactsDoorLine: RunFactsStrip.doorLine(for: runFacts),
+                            previewAvailable: previewAvailable,
                             onOpenPage: openPreview(at:),
                             coveredPages: VerificationResultsActions.concealedPages(in: findings),
                             formValueCount: Self.formValueCount(in: findings),
                             smallPrintAfterFindings: afterFindings ? smallPrint : nil,
                             onReviewInScan: {
                                 Self.reviewInScan(documentState: documentState, redactionState: redactionState)
-                            })
+                            },
+                            onOpenDoor: { _ in presentedPage = .whatBoxesCanShow })
                         footerBlock
                         trustStrip
                             .padding(.top, ResectaTokens.Spacing.xl)
@@ -132,6 +139,10 @@ struct VerificationResultsView: View {
         }
         .task(id: redactionState.regionVersion) {
             findings = ResultsFindings.derive(documentState: documentState, redactionState: redactionState)
+        }
+        .sheet(item: $presentedPage) { page in
+            LegalDocumentView(document: page)
+                .messageLayer(toastManager, role: .holdsOnly)
         }
         // VerificationActionBar is placed by the phase router in
         // DocumentEditorView as .safeAreaInset, not embedded here. Export

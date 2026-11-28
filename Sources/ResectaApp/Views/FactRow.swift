@@ -29,6 +29,8 @@ nonisolated struct ResultsFact: Equatable, Identifiable {
     var more: [String] = []
     /// The label of a link row at the end of the opened part.
     var door: String? = nil
+    /// The link row's spoken hint, when it has one.
+    var doorHint: String? = nil
     var place: Place = .last
     /// The row's identifier when it is not the `id`.
     var identifier: String? = nil
@@ -113,7 +115,7 @@ struct ResultsFactRow: View {
                                     .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                                     .fixedSize(horizontal: false, vertical: true)
                             case .door(let label):
-                                ResultsFactDoorRow(label: label, action: onDoor)
+                                ResultsFactDoorRow(label: label, hint: fact.doorHint, action: onDoor)
                             }
                         }
                     }
@@ -159,6 +161,7 @@ struct ResultsFactRowFrame: ViewModifier {
 /// sentence is approved.
 struct ResultsFactDoorRow: View {
     let label: String
+    var hint: String? = nil
     let action: () -> Void
 
     /// The label's colour: the teal made for small text.
@@ -181,5 +184,6 @@ struct ResultsFactDoorRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
+        .accessibilityHint(hint ?? "")
     }
 }

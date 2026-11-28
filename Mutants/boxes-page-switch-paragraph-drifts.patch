@@ -1,0 +1,18 @@
+Property: The page's section on the switch reads as the Settings footer does, sentence for sentence.
+Area: What Boxes Can Show, the section on the switch
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/WhatBoxesCanShowPageTests
+Must go red: ResectaAppTests/WhatBoxesCanShowPageTests switchParagraph
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Resources/WhatBoxesCanShow.md b/Resources/WhatBoxesCanShow.md
+--- a/Resources/WhatBoxesCanShow.md
++++ b/Resources/WhatBoxesCanShow.md
+@@ -16,7 +16,7 @@ The results screen counts every box as one that can still show how long its text
+ 
+ ## What Cover Other Words does
+ 
+-Where it can, Cover Other Words runs a box across every line it touches, out to where the lines above and below reach, and stops short of words that belong to another column, cell, or field. It can cover the other words there too, and that is its cost. It leaves a box as it is over a scan or a picture, on a page with text with no ink of its own, or on a page that is half or more a picture. It also leaves a box as it is over print that does not run upright and left to right, where there is too little unselected text above and below it to show its column, and where you drew, moved, or resized the box by hand. A widened box can still show about how long its text was: in a paragraph, by where the lines break, and more closely each time the same text appears.
++Where it can, Cover Other Words runs a box across every line it touches, out to where the lines above and below reach, and stops short of words that belong to another column, cell, or field. It leaves a box as it is over a scan or a picture, on a page with text with no ink of its own, or on a page that is half or more a picture. It also leaves a box as it is over print that does not run upright and left to right, where there is too little unselected text above and below it to show its column, and where you drew, moved, or resized the box by hand. A widened box can still show about how long its text was: in a paragraph, by where the lines break, and more closely each time the same text appears.
+ 
+ The cost can be every other word on those lines. In 1,463 public contracts and benefits documents, that was about ten or eleven other words for each line a box touches.
+ 

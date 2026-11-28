@@ -234,4 +234,39 @@ struct FactRowTests {
         #expect(seeded == 18)
         #expect(withCheck > 0 && withCheck < seeded)
     }
+
+    @Test("The boxes line opens to one link row, What Boxes Can Show, and no other run line opens")
+    func boxesLineOpensThePage() {
+        typealias Strip = VerificationResultsView.RunFactsStrip
+        let boxes = Strip.boxesLine(count: 3)
+        let lines = [Strip.ocrSkipLine(pages: [4]), boxes, Strip.sizeLine(bytes: 38_200_000)]
+        let facts = VerificationDetailsSection.runLineFacts(lines, doorLine: boxes)
+        #expect(facts.map(\.shown) == lines)
+        #expect(facts[1].door == "What Boxes Can Show")
+        #expect(facts[1].doorHint == "Opens What Boxes Can Show.")
+        #expect(facts[1].openedItems == [.door("What Boxes Can Show")])
+        for index in [0, 2] {
+            #expect(facts[index].door == nil && facts[index].doorHint == nil && !facts[index].opens)
+        }
+        // With no door line, no run line opens.
+        #expect(VerificationDetailsSection.runLineFacts(lines).allSatisfy { !$0.opens })
+    }
+
+    @Test("The door line is the boxes line while the run burned a box, and none otherwise")
+    func doorLineIsTheBoxesLine() {
+        typealias Strip = VerificationResultsView.RunFactsStrip
+        var facts = VerificationResultsView.RunFacts()
+        #expect(Strip.doorLine(for: facts) == nil)
+        for count in [1, 2, 40] {
+            facts.burnedBoxes = count
+            #expect(Strip.doorLine(for: facts) == Strip.boxesLine(count: count))
+            #expect(Strip.lines(for: facts).contains(Strip.boxesLine(count: count)))
+        }
+    }
+
+    @Test("The page's name is its title, its rows' label and its spoken hint")
+    func thePageName() {
+        #expect(LegalDocument.whatBoxesCanShow.title == "What Boxes Can Show")
+        #expect(VerificationResultsView.RunFactsStrip.doorHint == "Opens What Boxes Can Show.")
+    }
 }

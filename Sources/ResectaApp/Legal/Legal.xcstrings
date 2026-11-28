@@ -342,6 +342,17 @@
         }
       }
     },
+    "boxes_page_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What Boxes Can Show"
+          }
+        }
+      }
+    },
     "legal_doc_done" : {
       "extractionState" : "manual",
       "localizations" : {

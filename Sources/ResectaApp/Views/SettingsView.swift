@@ -121,6 +121,12 @@ struct SettingsView: View {
                     .ignoresSafeArea()
                     .messageLayer(toastManager, role: .holdsOnly)
             }
+            // The in-app pages (Acknowledgements, What Boxes Can Show), on
+            // the form so a row in any section can present one.
+            .sheet(item: $presentedLegalDocument) { document in
+                LegalDocumentView(document: document)
+                    .messageLayer(toastManager, role: .holdsOnly)
+            }
             // Mirrors the established
             // confirmation-dialog pattern used at Redact /
             // Delete N Regions / Pre-Export / Override-FAIL.
@@ -193,6 +199,12 @@ struct SettingsView: View {
             ))
             .accessibilityHint(RedactionBoxesCopy.switchHint)
             .accessibilityIdentifier("settingsBoxesAcrossColumnToggle")
+
+            // The full page about what a box can still show.
+            Button(LegalDocument.whatBoxesCanShow.title) {
+                presentedLegalDocument = .whatBoxesCanShow
+            }
+            .accessibilityIdentifier("settingsWhatBoxesCanShow")
         } header: {
             Text(RedactionBoxesCopy.sectionHeader)
         } footer: {
@@ -429,10 +441,6 @@ struct SettingsView: View {
                 presentedLegalDocument = .acknowledgements
             }
             .accessibilityIdentifier("settingsAcknowledgements")
-            .sheet(item: $presentedLegalDocument) { document in
-                LegalDocumentView(document: document)
-                    .messageLayer(toastManager, role: .holdsOnly)
-            }
         } header: {
             Label("Privacy", systemImage: "lock.shield")
         } footer: {
