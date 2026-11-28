@@ -156,6 +156,8 @@ struct FirstEditSamplePageTests {
         let documentState = try await Self.documentState(pdf)
         let rows = try G.table().cases.filter { $0.inputs.text == "sample-p1" }
         #expect(rows.count == 22)
+        let letters = try Self.pageLetters(pdf)
+        #expect(letters.count > 100, "the page's text gives \(letters.count) letters")
         #expect(Set(rows.map(\.id)).isSuperset(of: Self.aloneOnThePage + Self.placedByNoSearch))
         var placed: [Recipe: [RedactionRegion]] = [:]
         for row in rows where !Self.placedByNoSearch.contains(row.id) {
@@ -203,6 +205,15 @@ struct FirstEditSamplePageTests {
                 try G().perform(try #require(first.inputs.gesture), on: id, in: c, group: false, cancel: false)
             }
             let before = try #require(c.stored(id))
+            // Where each box the gesture moves starts: a found box on its first
+            // edit from the real start, any other from where it stands.
+            let planBefore = try #require(c.coordinator.planAtRead(pageIndex: 0))
+            var startOf: [UUID: [Int]] = [:]
+            for s in selected {
+                let stored = try #require(c.stored(s))
+                startOf[s] = s == id && before.textAnchored && start != nil
+                    ? Self.readBack(try #require(start).share) : Self.readBack(stored.normalizedRect)
+            }
             let addressBefore = row.id == Self.caseTen ? try Self.addressPaint(c, regions) : nil
             try G().perform(gesture, on: id, in: c, group: row.inputs.group == true, cancel: row.inputs.then == "cancel")
             // Case 10: through the real plan the Address box is a plan box of
@@ -235,6 +246,22 @@ struct FirstEditSamplePageTests {
             #expect(unmoved ? G.sixtyFourths(now.normalizedRect) == expected
                             : Self.distance(G.sixtyFourths(now.normalizedRect), expected) <= Self.carried,
                     "\(row.id): the stored box is \(G.sixtyFourths(now.normalizedRect)), not \(expected)")
+            // Cases 3, 9 and 11: every letter the page's plan covered before
+            // the edit, outside what the moved edges swept, is covered by the
+            // page's plan after it; with no edge moved, every one is.
+            let planAfter = try #require(c.coordinator.planAtRead(pageIndex: 0))
+            var swept: [[Int]] = []
+            if !unmoved {
+                for s in selected {
+                    swept += Self.swept(from: try #require(startOf[s]),
+                                        to: Self.readBack(try #require(c.stored(s)).normalizedRect))
+                }
+            }
+            let lost = letters.filter { letter in
+                Self.covered(letter, by: planBefore) && !swept.contains { Self.overlaps(letter, $0) }
+                    && !Self.covered(letter, by: planAfter)
+            }
+            #expect(lost.isEmpty, "\(row.id): \(lost.count) letters outside what the edges swept lost their cover, as \(lost.prefix(3))")
             if let anchored = row.expected.anchored {
                 #expect(now.textAnchored == anchored, "\(row.id): anchored \(now.textAnchored)")
             }
@@ -243,6 +270,54 @@ struct FirstEditSamplePageTests {
             }
             withExtendedLifetime(c) {}
         }
+    }
+
+    // MARK: - What the fill keeps
+
+    /// Every letter of the first page as its text gives it, each read as
+    /// the plan reads a share (`readBack`).
+    static func pageLetters(_ pdf: PDFDocument) throws -> [[Int]] {
+        let page = try #require(pdf.page(at: 0))
+        let text = (page.string ?? "") as NSString
+        let crop = page.bounds(for: .cropBox)
+        var letters: [[Int]] = []
+        for i in 0..<text.length {
+            guard let unit = Unicode.Scalar(text.character(at: i)),
+                  !CharacterSet.whitespacesAndNewlines.contains(unit) else { continue }
+            let r = page.characterBounds(at: i)
+            guard r.width > 0, r.height > 0 else { continue }
+            letters.append(readBack(CGRect(x: (r.minX - crop.minX) / crop.width, y: (r.minY - crop.minY) / crop.height,
+                                           width: r.width / crop.width, height: r.height / crop.height)))
+        }
+        return letters
+    }
+
+    /// Whether a box of `plan` paints over the whole of `letter`, within
+    /// `readings` on each side.
+    static func covered(_ letter: [Int], by plan: DrawnPlan) -> Bool {
+        plan.boxes.contains { box in
+            let p = readBack(box.paint)
+            return p[0] - readings <= letter[0] && p[1] - readings <= letter[1]
+                && letter[2] <= p[2] + readings && letter[3] <= p[3] + readings
+        }
+    }
+
+    static func overlaps(_ a: [Int], _ b: [Int]) -> Bool { a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3] }
+
+    /// What a box's edges swept between `start` and `end`: for each edge
+    /// that moved by more than a carried sixty-fourth, the strip between its
+    /// two places, across the span of both rectangles along it.
+    static func swept(from start: [Int], to end: [Int]) -> [[Int]] {
+        let lowX = min(start[0], end[0]), highX = max(start[2], end[2])
+        let lowY = min(start[1], end[1]), highY = max(start[3], end[3])
+        var strips: [[Int]] = []
+        for x in [0, 2] where abs(start[x] - end[x]) > carried {
+            strips.append([min(start[x], end[x]), lowY, max(start[x], end[x]), highY])
+        }
+        for y in [1, 3] where abs(start[y] - end[y]) > carried {
+            strips.append([lowX, min(start[y], end[y]), highX, max(start[y], end[y])])
+        }
+        return strips
     }
 
     // MARK: - What the real plan joins

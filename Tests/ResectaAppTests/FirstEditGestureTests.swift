@@ -59,6 +59,9 @@ struct FirstEditGestureTests {
         let start: Rect64?
         let clause: Int?
         let replanned: Bool?
+        /// The letters a row's edit leaves uncovered outside what its edges
+        /// swept: none, wherever the row gives the list.
+        let uncovered: [Rect64]?
     }
     struct Row: Decodable { let id: String; let inputs: Inputs; let expected: Expected }
     struct Table: Decodable { let rule: String; let cases: [Row] }
@@ -83,6 +86,8 @@ struct FirstEditGestureTests {
         let table = try Self.table()
         #expect(table.rule == "first-edit")
         #expect(table.cases.count == Self.rowCount)
+        let listed = table.cases.filter { $0.expected.uncovered != nil }
+        #expect(listed.count == 10 && listed.allSatisfy { $0.expected.uncovered?.isEmpty == true })
         #expect(Set(table.cases.map(\.id)).count == Self.rowCount, "every id once")
         let gestures = table.cases.filter { $0.inputs.gesture != nil }
         #expect(gestures.count == 179)
