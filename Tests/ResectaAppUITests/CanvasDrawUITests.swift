@@ -299,15 +299,6 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
             pageBarPosition.waitForExistence(timeout: 10),
             "The page bar never read '1 of 3' — the 3-page sample did not open on page 1."
         )
-        let toast = app.staticTexts
-            .matching(NSPredicate(format: "label BEGINSWITH 'Text layer detected'"))
-            .firstMatch
-        if toast.waitForExistence(timeout: 5) {
-            XCTAssertTrue(
-                toast.waitForNonExistence(timeout: 20),
-                "The text-layer toast never cleared."
-            )
-        }
         // Let the Home → editor cross-dissolve finish before the first tap.
         sleep(1)
     }

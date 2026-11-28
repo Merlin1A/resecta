@@ -30,14 +30,6 @@ nonisolated final class NoMatchOCRCopyUITests: XCTestCase {
         app.staticTexts.matching(NSPredicate(format: "label == %@", text)).firstMatch
     }
 
-    /// The image import's notice lies over the sheet while it shows; the
-    /// screenshots wait for it to go.
-    private func awaitImportNoticeGone() {
-        let notice = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label BEGINSWITH %@", "Image pages are read")).firstMatch
-        XCTAssertTrue(notice.waitForNonExistence(timeout: 30), "The image import's notice never cleared off the sheet.")
-    }
-
     func testScannedPageNoMatchNamesTheOCRPage() {
         app.launchArguments = ["--uitesting", "--loadTestImage", "--openSearchSheet", Self.query, "--searchDetent=large"]
         app.launch()
@@ -47,7 +39,11 @@ nonisolated final class NoMatchOCRCopyUITests: XCTestCase {
         // The OCR controls' caption no longer awaits once the run has completed.
         let caption = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "No results from text recognition")).firstMatch
         XCTAssertTrue(caption.waitForExistence(timeout: 10), "The OCR caption still awaits after the completed run.")
-        awaitImportNoticeGone()
+        // The image note stays in the editor's band until closed; with Search
+        // at its large height the band is hidden, so nothing lies over the sheet.
+        let note = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Image pages are read")).firstMatch
+        XCTAssertFalse(note.exists && note.isHittable, "The image note shows over Search at its large height.")
         attachScreenshot(named: "no-match-ocr-page")
     }
 
@@ -73,7 +69,6 @@ nonisolated final class NoMatchOCRCopyUITests: XCTestCase {
         XCTAssertLessThanOrEqual(copy.frame.maxX, window.maxX, "The description runs off the window's trailing edge.")
         // Wrapped, not truncated: many lines tall at AX5.
         XCTAssertGreaterThan(copy.frame.height, 200, "The description is \(copy.frame.height) pt tall at AX5: it did not wrap.")
-        awaitImportNoticeGone()
         attachScreenshot(named: "no-match-ocr-page-ax5")
     }
 }

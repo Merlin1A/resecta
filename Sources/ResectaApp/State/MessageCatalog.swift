@@ -11,7 +11,6 @@ import RedactionEngine
 
 /// Every message the toast queue shows, one case each.
 enum MessageID: Equatable {
-    case textLayerDetected
     case imagePagesNote
     case encryptedSource(hadRestrictions: Bool)
     case droppedFilesFirstOpened(count: Int)
@@ -51,7 +50,6 @@ enum MessageID: Equatable {
     /// The cases without their values: the names `--showToast=<name>` takes
     /// and the tests walk. The raw value is the case's name.
     enum Name: String, CaseIterable {
-        case textLayerDetected
         case imagePagesNote
         case encryptedSource
         case droppedFilesFirstOpened
@@ -89,7 +87,6 @@ enum MessageID: Equatable {
 
     var name: Name {
         switch self {
-        case .textLayerDetected: .textLayerDetected
         case .imagePagesNote: .imagePagesNote
         case .encryptedSource: .encryptedSource
         case .droppedFilesFirstOpened: .droppedFilesFirstOpened
@@ -130,7 +127,6 @@ enum MessageID: Equatable {
     /// `--showToast=<name>` hook shows.
     static func example(named name: Name) -> MessageID {
         switch name {
-        case .textLayerDetected: .textLayerDetected
         case .imagePagesNote: .imagePagesNote
         case .encryptedSource: .encryptedSource(hadRestrictions: false)
         case .droppedFilesFirstOpened: .droppedFilesFirstOpened(count: 2)
@@ -175,7 +171,6 @@ enum MessageID: Equatable {
     /// other corpus failure.
     static let examples: [MessageID] = {
         var all: [MessageID] = [
-            .textLayerDetected,
             .imagePagesNote,
             .encryptedSource(hadRestrictions: false),
             .encryptedSource(hadRestrictions: true),
@@ -318,25 +313,20 @@ enum MessageCatalog {
     /// keeps that builder's gate).
     static func row(for id: MessageID) -> MessageRow {
         switch id {
-        case .textLayerDetected:
-            return MessageRow(
-                text: "Text layer detected \u{2014} Scan and Search can match text in this document.",
-                todaySeverity: .info, kind: .notice, tone: .note,
-                phases: [.editing], mustBeSeen: false, coalescesRepeats: true, showsInRemainingLayer: true)
         case .imagePagesNote:
             return MessageRow(
                 text: RedactWorkspaceView.imageSourceMessage,
-                todaySeverity: .info, kind: .notice, tone: .caution,
-                phases: [.editing], mustBeSeen: true, coalescesRepeats: true, showsInRemainingLayer: true)
+                todaySeverity: nil, kind: .notice, tone: .caution,
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true, showsInRemainingLayer: false)
         case .encryptedSource(let hadRestrictions):
             return MessageRow(
                 text: RedactWorkspaceView.encryptedSourceMessage(hadRestrictions: hadRestrictions),
-                todaySeverity: .warning, kind: .notice, tone: .caution,
-                phases: [.editing], mustBeSeen: true, coalescesRepeats: true, showsInRemainingLayer: true)
+                todaySeverity: nil, kind: .notice, tone: .caution,
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true, showsInRemainingLayer: false)
         case .droppedFilesFirstOpened(let count):
             return MessageRow(
                 text: ImportService.dropOpenedFirstMessage(droppedCount: count),
-                todaySeverity: .info, kind: .notice, tone: .caution,
+                todaySeverity: nil, kind: .notice, tone: .caution,
                 phases: [.editing], mustBeSeen: true)
         case .unsupportedFormatDropped:
             // A receipt longer than a receipt's 75 characters: it answers

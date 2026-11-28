@@ -62,6 +62,25 @@ struct ImportAnnotationNoticeTests {
                 "dismissal is per-document and resets on import")
     }
 
+    @Test("An import resets the closed load notes and the dropped-files note")
+    func importResetsTheLoadNotes() async throws {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        // Stale values from a previously-open document: import must reset them.
+        doc.imagePagesNoteDismissed = true
+        doc.sourceProtectionNoteDismissed = true
+        doc.droppedFilesNoteCount = 4
+
+        await ImportService.importDocument(
+            data: try makeAnnotatedPDFData(), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+
+        #expect(doc.phaseKind == .editing)
+        #expect(doc.imagePagesNoteDismissed == false)
+        #expect(doc.sourceProtectionNoteDismissed == false)
+        #expect(doc.droppedFilesNoteCount == nil)
+    }
+
     @Test("PDF without annotations stages nothing")
     func cleanImportStagesNothing() async {
         let doc = DocumentState()

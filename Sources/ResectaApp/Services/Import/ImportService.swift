@@ -385,7 +385,7 @@ enum ImportService {
         documentState.sourceHasHiddenOCG = loaded.facts.hasHiddenOCG
         documentState.sourceAnnotationFindings = loaded.facts.annotationFindings
         documentState.sourceFilledFormFieldCount = loaded.facts.filledFormFieldCount
-        documentState.annotationNoticeDismissed = false
+        documentState.loadNotes = LoadNotes()  // every note's closed state, and the dropped-files count
         documentState.lastUsedPipelineMode = nil
         documentState.documentOverride = nil
         documentState.wasPausedByBackground = false

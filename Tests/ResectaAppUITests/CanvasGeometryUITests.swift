@@ -583,8 +583,6 @@ private extension CanvasGeometryUITests {
         let dismiss = app.buttons["searchDismissButton"]
         if dismiss.waitForExistence(timeout: 10) { dismiss.tap() }
         _ = dismiss.waitForNonExistence(timeout: 10)
-        let toast = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Text layer detected'")).firstMatch
-        if toast.waitForExistence(timeout: 4) { _ = toast.waitForNonExistence(timeout: 20) }
         sleep(2)
         let page = try XCTUnwrap(try probe().fitPage(), "the page at fit is measurable")
         return Stack(page: page)
@@ -594,8 +592,6 @@ private extension CanvasGeometryUITests {
         app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"] + extra
         app.launch()
         XCTAssertTrue(app.buttons["drawTool"].waitForExistence(timeout: 60), "the editor never appeared")
-        let toast = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Text layer detected'")).firstMatch
-        if toast.waitForExistence(timeout: 4) { _ = toast.waitForNonExistence(timeout: 20) }
         sleep(1)
     }
 
