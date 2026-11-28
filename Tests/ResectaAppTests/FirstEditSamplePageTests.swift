@@ -431,4 +431,84 @@ struct FirstEditSamplePageTests {
                 "moved from the start: \(moved)")
         withExtendedLifetime(c) {}
     }
+    // MARK: - The keeper's plan, with no run and no read handed in
+
+    /// The document as it opens: no run has read it, and no page's read is
+    /// held.
+    static func unreadDocument(_ pdf: PDFDocument) -> DocumentState {
+        let documentState = DocumentState()
+        documentState.sourceDocument = pdf
+        return documentState
+    }
+
+    /// The overlay the coordinator makes for the first page, with the reader
+    /// the coordinator gives it.
+    static func coordinatorsOverlay(_ coordinator: PDFViewCoordinator, _ pdf: PDFDocument) throws -> RedactionOverlayView {
+        let view = PDFView(frame: CGRect(x: 0, y: 0, width: 300, height: 420))
+        view.document = pdf
+        let page = try #require(pdf.page(at: 0))
+        return try #require(coordinator.pdfView(view, overlayViewFor: page) as? RedactionOverlayView)
+    }
+
+    /// The first page drawn through the keeper, as the canvas's drawing pass
+    /// draws it: with no read held, the first pass keeps no plan and asks for
+    /// the page's read; once the read is held, the redraw keeps the plan,
+    /// made with it.
+    static func drawnUntilKept(_ coordinator: PDFViewCoordinator, _ state: RedactionState,
+                               _ documentState: DocumentState) async throws -> DrawnPlan {
+        coordinator.noteDrawn(pageIndex: 0, regions: state.regions[0] ?? [])
+        #expect(state.drawnPlans[0] == nil, "no plan is kept before the page's read is held")
+        for _ in 0..<400 where documentState.pageReads[0] == nil {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        try #require(documentState.pageReads[0] != nil, "the drawing pass asked for the page's read, and it is held")
+        coordinator.noteDrawn(pageIndex: 0, regions: state.regions[0] ?? [])
+        return try #require(state.drawnPlans[0], "the redraw keeps the page's plan")
+    }
+
+    static func same(_ a: DrawnPlan.FirstEditStart?, _ b: DrawnPlan.FirstEditStart?) -> Bool {
+        a?.clause == b?.clause && a.map { G.sixtyFourths($0.share) } == b.map { G.sixtyFourths($0.share) }
+    }
+
+    @Test("With no run and no read handed in, the overlay the coordinator makes reads a found box's start from the plan its drawing pass keeps, made with the page's words")
+    func aStartFromTheKeepersPlan() async throws {
+        let pdf = try Self.samplePDF()
+        let documentState = Self.unreadDocument(pdf)
+        let coordinator = try Self.coordinator(documentState)
+        let regions = await Self.placed(pdf, Self.modes(.statement))
+        let mail = try #require(Self.at(Self.joined[1].rect, in: regions).first)
+        let state = Self.stored(regions, on: coordinator)
+        let overlay = try Self.coordinatorsOverlay(coordinator, pdf)
+        // The stated limit: before the page's read is held there is no start,
+        // and the box edits from its own rectangle, as before.
+        #expect(overlay.startReader(mail.id) == nil, "no start before the page's read is held")
+        let kept = try await Self.drawnUntilKept(coordinator, state, documentState)
+        let start = try #require(overlay.startReader(mail.id), "the overlay's own reader gives the e-mail box a start")
+        #expect(start.clause == 3, "clause \(start.clause)")
+        #expect(Self.same(start, kept.firstEditStart(for: mail.id)), "read from the kept plan")
+        withExtendedLifetime(overlay) {}
+    }
+
+    @Test("With no run and no read handed in, after a Search result the page has not drawn yet, the start comes from the plan made at the read, with the read its drawing pass asked for")
+    func aStartFromThePlanMadeAtTheDrawingPassRead() async throws {
+        let pdf = try Self.samplePDF()
+        let documentState = Self.unreadDocument(pdf)
+        let coordinator = try Self.coordinator(documentState)
+        let regions = await Self.placed(pdf, Self.modes(.statement))
+        let mail = try #require(Self.at(Self.joined[1].rect, in: regions).first)
+        let state = Self.stored(regions, on: coordinator)
+        let overlay = try Self.coordinatorsOverlay(coordinator, pdf)
+        let kept = try await Self.drawnUntilKept(coordinator, state, documentState)
+        // One more Search result placed on the page, which has not drawn
+        // since: the kept plan is of an older version of the page.
+        let added = try #require(await Self.placed(pdf, [.text("Checking", options: SearchOptions())]).first)
+        state.addRegion(added, page: 0, undoManager: nil)
+        #expect(kept.pageVersion != state.pageVersion(0), "the kept plan is not of the page as stored")
+        let start = try #require(overlay.startReader(mail.id),
+                                 "a box due a start by clause 3 has one: the plan made at the read has the page's words")
+        #expect(start.clause == 3, "clause \(start.clause)")
+        #expect(Self.same(start, coordinator.planAtRead(pageIndex: 0)?.firstEditStart(for: mail.id)),
+                "read from the plan made at the read")
+        withExtendedLifetime(overlay) {}
+    }
 }
