@@ -189,6 +189,9 @@ struct PipelineRunner {
             // filesystem default, which is no worse than the prior
             // contract.
             try? TempFileHardening.applyProtection(outputURL, level: .complete)
+            // The size of the file this run made, read once, here.
+            let outputBytes = (try? FileManager.default.attributesOfItem(atPath: outputURL.path))?[.size]
+                .flatMap { $0 as? NSNumber }?.int64Value
 
             sink(.redactionFinished(
                 outputURL: outputURL,
@@ -202,7 +205,10 @@ struct PipelineRunner {
                     degradeFailures: entry.degradeFailures,
                     burnedRegionVersion: entry.burnedRegionVersion,
                     burnedRegions: runContext.burnedRegions,
-                    record: RunRecord(confirmed: entry.confirmed, produced: runContext.produced))))
+                    record: RunRecord(confirmed: entry.confirmed, produced: runContext.produced),
+                    pagesNotSearchedInFull: entry.pagesNotSearchedInFull,
+                    smallPicturePages: entry.smallPicturePages,
+                    outputBytes: outputBytes)))
 
             // --- Verification ---
             // Paranoid-mode override #2: paranoid
@@ -259,6 +265,11 @@ struct PipelineRunner {
         /// drawn (`RunRecord.Confirmed.firstPageWithUnconfirmedBoxPlace`);
         /// nil when every page's are.
         let unconfirmedBoxPage: Int?
+        /// The pages the stop at Redact named, answered or not, and the pages
+        /// whose only gap is small pictures, from the closed runs as they
+        /// stand at entry (after the Redact tap closed any running search).
+        let pagesNotSearchedInFull: Set<Int>
+        let smallPicturePages: Set<Int>
     }
 
     /// Read the full run's entry snapshot. The manual-term capture
@@ -366,13 +377,18 @@ struct PipelineRunner {
         // result limit or stopped. Not the last completed Scan's record alone.
         let ocrSkippedPages = redactionState.pagesTooLarge(
             applied: appliedSearches.compactMap { $0.record.accountToken })
+        // What the results screen says was not read before Redact, from the
+        // runs the stop at Redact reads, as they stand in this region state.
+        let closedRuns = redactionState.closedSearchRuns
         return RunEntry(
             pages: pages, sensitiveTerms: sensitiveTerms,
             deselectionSnapshot: deselectionSnapshot,
             ocrSkippedPages: ocrSkippedPages, degradeFailures: degradeFailures,
             appliedSearches: appliedSearches,
             burnedRegionVersion: burnedRegionVersion, captureRuns: captureRuns,
-            confirmed: confirmed, unconfirmedBoxPage: unconfirmedBoxPage)
+            confirmed: confirmed, unconfirmedBoxPage: unconfirmedBoxPage,
+            pagesNotSearchedInFull: RedactStop.pagesNotSearchedInFull(runs: closedRuns),
+            smallPicturePages: RedactStop.smallPicturePages(runs: closedRuns))
     }
 
     // MARK: - Verify-only re-run

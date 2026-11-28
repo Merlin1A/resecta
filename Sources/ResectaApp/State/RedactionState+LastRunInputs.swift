@@ -34,5 +34,16 @@ extension RedactionState {
         /// output. Nil only where the inputs were built by hand (the debug
         /// seed and tests): such an output's boxes cannot be checked.
         var record: RunRecord? = nil
+        /// The pages the stop at Redact named across the document's closed
+        /// runs, answered or not (`RedactStop.pagesNotSearchedInFull`), read
+        /// at run entry. Empty where the inputs were built by hand.
+        var pagesNotSearchedInFull: Set<Int> = []
+        /// The pages whose only gap is small pictures in those runs
+        /// (`RedactStop.smallPicturePages`), read at run entry.
+        var smallPicturePages: Set<Int> = []
+        /// The output's size in bytes, read from the promoted file when the
+        /// run finished. Nil where the inputs were built by hand, or when the
+        /// file's attributes could not be read.
+        var outputBytes: Int64? = nil
     }
 }
