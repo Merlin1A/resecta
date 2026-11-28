@@ -5,15 +5,33 @@ Must go red: RedactionEngineTests/ShownJoinTests paintedPageHoldsWhatWasShown; R
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-index 212ae6653..5e68e240c 100644
+index 68d303cf8..0c523208e 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-@@ -396,7 +396,7 @@ extension PageRasterizer {
+@@ -407,7 +407,7 @@ extension PageRasterizer {
+                 if let placed = PaintPlan.asPlaced(regions: [(id, share)], widthSixtyFourths: raster.widthSixtyFourths,
+                                                    heightSixtyFourths: raster.heightSixtyFourths).boxes.first,
+                    let (fill, projection) = Self.boxFillAndProjection(
+-                       box: placed, regions: regionsByID, raster: raster, content: content, shownDPI: shownDPI) {
++                       box: placed, regions: regionsByID, raster: raster, content: content, shownDPI: nil) {
+                     rect = rect.union(fill.bitmapRect)
+                     if regionGrows,
+                        let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
+@@ -419,7 +419,7 @@ extension PageRasterizer {
+                     if regionGrows, let grown = try inkGrowthRect(context: ctx, fillRect: filled) {
+                         rect = rect.union(grown)
+                     }
+-                    if let shown = Self.shownRegionFill(region, raster: raster, shownDPI: shownDPI) {
++                    if let shown = Self.shownRegionFill(region, raster: raster, shownDPI: nil) {
+                         rect = rect.union(shown)
+                     }
+                 }
+@@ -436,7 +436,7 @@ extension PageRasterizer {
          func asPlacedRect(_ box: PaintedBox, grows: Bool) throws -> CGRect? {
              guard let (fill, projection) = Self.boxFillAndProjection(
                  box: box, regions: regionsByID, raster: raster, content: content,
 -                shownDPI: shownDPI) else { return nil }
 +                shownDPI: nil) else { return nil }
              var rect = fill.bitmapRect
-             guard grows else { return rect }
-             let edge = projection.marginEdge.bitmapRect
+             if grows, let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
+                 rect = rect.union(grown)

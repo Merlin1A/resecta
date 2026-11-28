@@ -5,21 +5,18 @@ Must go red: RedactionEngineTests/PlanSwitchTests limitedSideKeepsTheAsPlacedGro
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-index 8dddf23..d86bde9 100644
+index 68d303cf8..83d08507a 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-@@ -327,13 +327,7 @@ extension PageRasterizer {
-             }
-             let today = PaintPlan.asPlaced(regions: own, widthSixtyFourths: raster.widthSixtyFourths,
-                                            heightSixtyFourths: raster.heightSixtyFourths)
--            for placed in today.boxes {
--                guard let p = PixelPlan.project(inner: placed.inner, paint: placed.paint, limitAbove: nil,
--                                                limitBelow: nil, raster: raster),
--                      !edge.contains(p.marginEdge.bitmapRect),
--                      let grown = try inkGrowthRect(context: ctx, fillRect: p.marginEdge.bitmapRect) else { continue }
--                rect = rect.union(grown)
--            }
-+            _ = today
-             return rect
-         }
-         for (index, box) in boxes.enumerated() {
+@@ -409,10 +409,7 @@ extension PageRasterizer {
+                    let (fill, projection) = Self.boxFillAndProjection(
+                        box: placed, regions: regionsByID, raster: raster, content: content, shownDPI: shownDPI) {
+                     rect = rect.union(fill.bitmapRect)
+-                    if regionGrows,
+-                       let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
+-                        rect = rect.union(grown)
+-                    }
++                    _ = (regionGrows, projection)
+                 } else {
+                     let filled = normalizedToFillPixels(r, content: content)
+                     if !filled.intersection(bitmap).isEmpty { rect = rect.union(filled.intersection(bitmap)) }
