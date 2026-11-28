@@ -1,0 +1,19 @@
+Property: A page drawn before its read is held keeps the plan made as placed without it, so its canvas shows the fill it showed before the plan read words. Here it keeps no plan until the read is held, and the canvas draws every box by its line with the fill unchecked.
+Area: the editor's kept plan before the page's read (noteDrawn)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayDrawnPlanTests
+Must go red: ResectaAppTests/OverlayDrawnPlanTests aPageDrawnBeforeItsRead()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+index 7c676c94a..41de4e534 100644
+--- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
++++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+@@ -558,6 +558,8 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+         let made: DrawnPlan
+         if RunRecord.planReadsWords, read == nil, !regions.isEmpty {
+             askPageRead(pageIndex, of: documentState)
++            state.drawnPlans[pageIndex] = nil
++            return
+             made = DrawnPlan.beforeRead(pageIndex: pageIndex, regions: regions, cropBox: cropBox,
+                                         rotation: page.rotation, switchOn: settings.boxesAcrossColumn,
+                                         exportDPI: quality, fillColor: settings.fillColor)
