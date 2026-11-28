@@ -287,6 +287,12 @@ extension RedactionOverlayView {
     /// region whose body holds the point (the later one on a tie); else,
     /// within `halo` of a region, the region whose edge is nearest (the
     /// later one on a tie). `regions` is in append order.
+    /// Before all of that, with `coreSize` and `selected`: a point inside the
+    /// core of a drawn handle of the selected region (a square `coreSize`
+    /// wide centred on it, not slid) picks the nearest such handle, the
+    /// first of equals in `handleCentres`' order, whatever lies beneath. On
+    /// the selected region itself the region is decided as if it were alone:
+    /// its handles' boxes, then its body, and no region beneath takes it.
     static func resolveHitTarget(
         at point: CGPoint,
         regions: [(id: UUID, rect: CGRect)],
@@ -295,8 +301,24 @@ extension RedactionOverlayView {
         handleSize: CGFloat,
         minimumHandleSize: CGFloat,
         containerBounds: CGRect?,
-        fingerScale: CGFloat = 1
+        fingerScale: CGFloat = 1,
+        coreSize: CGFloat? = nil
     ) -> CanvasHitTarget? {
+        if let selected, let coreSize,
+           let core = handleCentres(for: selected.rect, fingerScale: fingerScale)
+               .filter({ CGRect(x: $0.1.x - coreSize / 2, y: $0.1.y - coreSize / 2,
+                                width: coreSize, height: coreSize).contains(point) })
+               .min(by: { lhs, rhs in
+                   let ldx = lhs.1.x - point.x, ldy = lhs.1.y - point.y
+                   let rdx = rhs.1.x - point.x, rdy = rhs.1.y - point.y
+                   return (ldx * ldx + ldy * ldy) < (rdx * rdx + rdy * rdy)
+               }) {
+            guard selected.rect.contains(point) else { return .handle(core.0) }
+            return resolveResizeHandle(
+                at: point, regionRect: selected.rect, targetHandleSize: handleSize,
+                minimumHandleSize: minimumHandleSize, containerBounds: containerBounds,
+                fingerScale: fingerScale).map { .handle($0) } ?? .region(selected.id)
+        }
         if let selected,
            !regions.contains(where: { $0.id != selected.id && $0.rect.contains(point) }),
            let handle = resolveResizeHandle(
@@ -336,7 +358,8 @@ extension RedactionOverlayView {
             handleSize: ResectaTokens.TouchTarget.minimum * fingerScale,
             minimumHandleSize: 22 * fingerScale,
             containerBounds: bounds,
-            fingerScale: fingerScale)
+            fingerScale: fingerScale,
+            coreSize: ResectaTokens.Canvas.handleCore * fingerScale)
     }
 
     func hitTestRegion(at point: CGPoint) -> RedactionRegion? {
