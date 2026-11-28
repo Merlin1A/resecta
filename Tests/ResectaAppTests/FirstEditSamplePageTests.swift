@@ -1,6 +1,7 @@
 import CoreGraphics
 import CryptoKit
 import Foundation
+import NaturalLanguage
 import PDFKit
 import Testing
 import UIKit
@@ -202,7 +203,16 @@ struct FirstEditSamplePageTests {
                 try G().perform(try #require(first.inputs.gesture), on: id, in: c, group: false, cancel: false)
             }
             let before = try #require(c.stored(id))
+            let addressBefore = row.id == Self.caseTen ? try Self.addressPaint(c, regions) : nil
             try G().perform(gesture, on: id, in: c, group: row.inputs.group == true, cancel: row.inputs.then == "cancel")
+            // Case 10: through the real plan the Address box is a plan box of
+            // its own, and it paints the same after the P.O. box's first edit
+            // as before it.
+            if row.id == Self.caseTen {
+                let after = try Self.addressPaint(c, regions)
+                #expect(addressBefore != nil && after == addressBefore,
+                        "case 10: the Address box paints \(String(describing: after)), before \(String(describing: addressBefore))")
+            }
             if row.inputs.then == "undo" { c.undo.undo() }
             let now = try #require(c.stored(id))
             // Where the row's box ends: back where it was, for a gesture that
@@ -243,17 +253,38 @@ struct FirstEditSamplePageTests {
                                 Rect64(minX: 3456, minY: 39773, maxX: 36225, maxY: 42251)]
 
     /// The boxes the real plan joins, with each one's clause: "hartwell"
-    /// (Search) inside "d.hartwell@example.net" (Scan), and on each of two
-    /// lines "DELIA" beside "HARTWELL", which Search and Scan place at one
-    /// rectangle.
+    /// (Search) inside "d.hartwell@example.net" (Scan). The plan also joins
+    /// the two capital lines' names (`namedLines`), but those are Scan's
+    /// names, and an iOS 26 simulator without the system's name model places
+    /// none of them; the engine's test of the page's found boxes holds them
+    /// on the Mac, and `theNamedLinesJoinWhereTheModelTags` on a simulator
+    /// that carries the model.
     static let joined: [(rect: Rect64, clause: Int)] = [
         (Rect64(minX: 30215, minY: 37628, maxX: 32292, maxY: 38287), 2),
         (Rect64(minX: 29732, minY: 37628, maxX: 36012, maxY: 38287), 3),
-        (Rect64(minX: 7008, minY: 25404, maxX: 8558, maxY: 26063), 3),
-        (Rect64(minX: 8703, minY: 25404, maxX: 11663, maxY: 26063), 3),
-        (Rect64(minX: 7008, minY: 23900, maxX: 8558, maxY: 24559), 3),
-        (Rect64(minX: 8703, minY: 23900, maxX: 11663, maxY: 24559), 3),
     ]
+
+    /// On each of the statement's two capital lines, "DELIA" beside
+    /// "HARTWELL", which Search and Scan place at one rectangle: the plan
+    /// joins the three in one plan box, each starting by clause 3, and the
+    /// two equal boxes hold neither the other.
+    static let namedLines: [(delia: Rect64, hartwell: Rect64)] = [
+        (Rect64(minX: 7008, minY: 25404, maxX: 8558, maxY: 26063), Rect64(minX: 8703, minY: 25404, maxX: 11663, maxY: 26063)),
+        (Rect64(minX: 7008, minY: 23900, maxX: 8558, maxY: 24559), Rect64(minX: 8703, minY: 23900, maxX: 11663, maxY: 24559)),
+    ]
+
+    /// The row of case 10: the P.O. box's first edit, inside the wide
+    /// Address box.
+    static let caseTen = "J-B-sample-boxes-pobox-right-out-2"
+
+    /// The paint of the wide Address box that holds the P.O. box, in the
+    /// page's plan as the coordinator makes it now, in sixty-fourths; nil
+    /// when that box is not a plan box of its own.
+    static func addressPaint(_ c: G.Canvas, _ regions: [RedactionRegion]) throws -> [Int]? {
+        let address = try #require(at(characterless[0], in: regions).first)
+        let plan = try #require(c.coordinator.planAtRead(pageIndex: 0))
+        return plan.boxes.first { $0.regionIDs == [address.id] }.map { G.sixtyFourths($0.paint) }
+    }
 
     static func stored(_ regions: [RedactionRegion], on coordinator: PDFViewCoordinator) -> RedactionState {
         let state = RedactionState()
@@ -300,8 +331,40 @@ struct FirstEditSamplePageTests {
                 #expect((plan.boxes.first { $0.regionIDs.contains(region.id) }?.regionIDs.count ?? 0) > 1, "\(rect): joined")
             }
         }
-        // Search and Scan place "HARTWELL" twice at one rectangle on each line.
-        #expect(at(Self.joined[3].rect).count == 2 && at(Self.joined[5].rect).count == 2)
+    }
+
+    /// Runs where the run asks for it, on a simulator that carries the name
+    /// model: the model is checked first, so a run without it fails here
+    /// rather than passing on boxes Scan never placed.
+    @Test("Where the name model tags names, the plan joins each capital line's three boxes, the two at one rectangle holding neither the other",
+          .enabled(if: ProcessInfo.processInfo.environment["FIRST_EDIT_SAMPLE_NAMES"] == "1"))
+    func theNamedLinesJoinWhereTheModelTags() async throws {
+        let text = "Last Friday Robert Miller met Sarah Thompson at the branch."
+        let tagger = NameDetector.makeNameTagger(for: text)
+        var names = 0
+        tagger.enumerateTags(in: text.startIndex..<text.endIndex, unit: .word, scheme: .nameType) { tag, _ in
+            if tag == .personalName { names += 1 }
+            return true
+        }
+        try #require(names > 0, "the name model tags nothing in this process; this case needs a simulator that carries it")
+        let pdf = try Self.samplePDF()
+        let coordinator = try Self.coordinator(try await Self.documentState(pdf))
+        let regions = await Self.placed(pdf, Self.modes(.statement))
+        _ = Self.stored(regions, on: coordinator)
+        let plan = try #require(coordinator.planAtRead(pageIndex: 0))
+        let reader = coordinator.firstEditStartReader(pageIndex: 0)
+        for line in Self.namedLines {
+            let delia = Self.at(line.delia, in: regions), hartwell = Self.at(line.hartwell, in: regions)
+            try #require(delia.count == 1 && hartwell.count == 2,
+                         "\(line.delia): \(delia.count) and \(hartwell.count) boxes; on its line \(Self.onTheLine(line.delia, regions))")
+            let members = Set((delia + hartwell).map(\.id))
+            for region in delia + hartwell {
+                #expect(reader(region.id)?.clause == 3,
+                        "\(line.delia.minY): clause \(String(describing: reader(region.id)?.clause))")
+                #expect(plan.boxes.first { $0.regionIDs.contains(region.id) }.map { Set($0.regionIDs) } == members,
+                        "\(line.delia.minY): the three in one plan box")
+            }
+        }
     }
 
     // MARK: - A plan of the page as it is
@@ -350,19 +413,20 @@ struct FirstEditSamplePageTests {
         let pdf = try Self.samplePDF()
         let coordinator = try Self.coordinator(try await Self.documentState(pdf))
         let regions = await Self.placed(pdf, Self.modes(.statement))
-        let delia = try #require(Self.at(Self.joined[2].rect, in: regions).first,
-                                 "on its line \(Self.onTheLine(Self.joined[2].rect, regions))")
-        let c = try G().mount(regions, selected: [delia.id], starts: [:], coordinator: coordinator)
+        // The e-mail address's box, which the real plan starts by clause 3.
+        let mail = try #require(Self.at(Self.joined[1].rect, in: regions).first,
+                                "on its line \(Self.onTheLine(Self.joined[1].rect, regions))")
+        let c = try G().mount(regions, selected: [mail.id], starts: [:], coordinator: coordinator)
         c.overlay.startReader = coordinator.firstEditStartReader(pageIndex: 0)
         // An edit on the next page; this page has kept no plan.
         c.state.addRegion(G.hand(CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.05)), page: 1, undoManager: c.undo)
         #expect(c.state.drawnPlans[0] == nil)
-        let start = try #require(coordinator.firstEditStartReader(pageIndex: 0)(delia.id),
+        let start = try #require(coordinator.firstEditStartReader(pageIndex: 0)(mail.id),
                                  "a box due a start by clause 3 has one: the plan made at the read has the page's words")
         #expect(start.clause == 3)
         c.undo.removeAllActions()
-        try nudgeRight(delia.id, in: c)
-        let moved = G.sixtyFourths(try #require(c.stored(delia.id)).normalizedRect)
+        try nudgeRight(mail.id, in: c)
+        let moved = G.sixtyFourths(try #require(c.stored(mail.id)).normalizedRect)
         #expect(Self.distance(moved, zip(G.sixtyFourths(start.share), [64, 0, 64, 0]).map(+)) <= Self.carried,
                 "moved from the start: \(moved)")
         withExtendedLifetime(c) {}

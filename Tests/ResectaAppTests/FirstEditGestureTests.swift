@@ -207,6 +207,20 @@ struct FirstEditGestureTests {
     /// A point on a box's body, clear of its handles' touch boxes.
     static func body(_ rect: CGRect) -> CGPoint { CGPoint(x: rect.minX + rect.width / 4, y: rect.midY) }
 
+    /// A point on the box `id`'s body that the overlay gives to that box:
+    /// `body(rect)`, or, where a smaller box inside it holds that point (a
+    /// word placed inside a wider result), the first point along its middle
+    /// line, in eighths of its width, that the box takes itself.
+    static func bodyPoint(of id: UUID, in rect: CGRect, overlay: RedactionOverlayView) -> CGPoint {
+        let first = body(rect)
+        if overlay.hitTarget(at: first, handles: true) == .region(id) { return first }
+        for i in 1..<8 {
+            let p = CGPoint(x: rect.minX + rect.width * CGFloat(i) / 8, y: rect.midY)
+            if overlay.hitTarget(at: p, handles: true) == .region(id) { return p }
+        }
+        return first
+    }
+
     /// A table resize as handle drags: each drag moves at most one edge on
     /// each axis, the first edit's first. In the canvas's points (y down):
     /// the page's top is the canvas's top edge.
@@ -270,7 +284,8 @@ struct FirstEditGestureTests {
     /// `cancel`.
     func perform(_ gesture: Gesture, on id: UUID, in c: Canvas, group: Bool, cancel: Bool) throws {
         if gesture.type == "move" {
-            let down = Self.body(c.overlay.pdfNormalizedToOverlay(try #require(c.copy(id)).normalizedRect))
+            let down = Self.bodyPoint(of: id, in: c.overlay.pdfNormalizedToOverlay(try #require(c.copy(id)).normalizedRect),
+                                      overlay: c.overlay)
             let travel = CGVector(dx: CGFloat(gesture.dx ?? 0) / 64, dy: -CGFloat(gesture.dy ?? 0) / 64)
             drag(c, from: down, through: Self.path(from: down, travel: travel), grab: group ? .groupMove : .move,
                  cancel: cancel)
