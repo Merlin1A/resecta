@@ -537,8 +537,11 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// the quality a run started now uses (`runQuality`, the run's own
     /// function, under `qualityCap`), with the user's switch and the page's
     /// read, as the run's entry hands them to the same maker. While the plan
-    /// reads words, a page with regions whose read is not held yet keeps no
-    /// plan: its read is asked for, and the page redraws when it is held.
+    /// reads words, a page with regions whose read is not held yet keeps the
+    /// plan made as placed without it (`DrawnPlan.beforeRead`, marked
+    /// `madeWithoutRead`), so it shows what it showed before the plan read
+    /// words: its read is asked for, and the page redraws, keeping the plan
+    /// made with the read, when it is held.
     /// `drawn` is false when a change of the cap re-keys a kept plan: the
     /// plan is made again, but the quality the page was shown at stays
     /// until the page is drawn. A page drawn while its read is asked for
@@ -552,14 +555,18 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
                                  rotation: page.rotation) ?? min(settings.exportDPI, qualityCap)
         if isDrawn, state.shownDPIs[pageIndex] != quality { state.shownDPIs[pageIndex] = quality }
         let read = documentState.pageReads[pageIndex]
+        let made: DrawnPlan
         if RunRecord.planReadsWords, read == nil, !regions.isEmpty {
-            state.drawnPlans[pageIndex] = nil
             askPageRead(pageIndex, of: documentState)
-            return
+            made = DrawnPlan.beforeRead(pageIndex: pageIndex, regions: regions, cropBox: cropBox,
+                                        rotation: page.rotation, switchOn: settings.boxesAcrossColumn,
+                                        exportDPI: quality, fillColor: settings.fillColor)
+        } else {
+            made = DrawnPlan(pageIndex: pageIndex, regions: regions, cropBox: cropBox,
+                             rotation: page.rotation, switchOn: settings.boxesAcrossColumn,
+                             exportDPI: quality, fillColor: settings.fillColor, read: read)
         }
-        let drawn = DrawnPlan(pageIndex: pageIndex, regions: regions, cropBox: cropBox,
-                              rotation: page.rotation, switchOn: settings.boxesAcrossColumn,
-                              exportDPI: quality, fillColor: settings.fillColor, read: read)
+        let drawn = made
             .stamped(pageVersion: state.pageVersion(pageIndex),
                      fromStoredRegions: regions == state.regions[pageIndex] ?? [])
         if state.drawnPlans[pageIndex] != drawn { state.drawnPlans[pageIndex] = drawn }

@@ -77,8 +77,8 @@ struct OverlayDrawnPlanTests {
 
     /// A coordinator wired to `pdf` and `state`, with the chosen quality 300.
     /// A coordinator on `pdf` whose document holds each page's read, as the
-    /// run's entry does: the editor keeps no plan for a page whose read it
-    /// does not hold yet.
+    /// run's entry does: for a page whose read it does not hold yet, the
+    /// editor keeps only the plan made without it (`aPageDrawnBeforeItsRead`).
     static func coordinator(_ pdf: PDFDocument, _ state: RedactionState, suite: String) async throws -> PDFViewCoordinator {
         let documentState = DocumentState()
         documentState.sourceDocument = pdf
@@ -93,6 +93,62 @@ struct OverlayDrawnPlanTests {
         coordinator.redactionState = state
         coordinator.settingsState = settings
         return coordinator
+    }
+
+    @Test("A page drawn before its read is held keeps the plan made as placed, marked, and the quality it was shown at; when the read is held the page redraws and keeps the plan made with it")
+    func aPageDrawnBeforeItsRead() async throws {
+        let pdf = try Self.document()
+        let documentState = DocumentState()
+        documentState.sourceDocument = pdf
+        let suite = "OverlayDrawnPlanTests.aPageDrawnBeforeItsRead"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        let settings = SettingsState(defaults: defaults)
+        settings.exportDPI = 300
+        let state = RedactionState()
+        let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)
+        state.addRegion(region, page: 0, undoManager: nil)
+        let coordinator = PDFViewCoordinator()
+        coordinator.documentState = documentState
+        coordinator.redactionState = state
+        coordinator.settingsState = settings
+        let view = PDFView(frame: CGRect(x: 0, y: 0, width: 300, height: 420))
+        view.document = pdf
+        let page = try #require(pdf.page(at: 0))
+        let overlay = try #require(coordinator.pdfView(view, overlayViewFor: page) as? RedactionOverlayView)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 300, height: 420))
+        overlay.frame = window.bounds
+        window.addSubview(overlay)
+        window.isHidden = false
+        overlay.configure(with: [region], selectedIDs: [])
+        try #require(documentState.pageReads[0] == nil, "precondition: the page's read is not held")
+
+        // The pass before the read keeps the plan made as placed, marked.
+        overlay.setNeedsDisplay()
+        overlay.boxLayers.applyPendingPass()
+        let cropBox = page.bounds(for: .cropBox).size
+        let before = try #require(state.drawnPlans[0], "a page drawn before its read keeps a plan")
+        #expect(before.madeWithoutRead)
+        #expect(before == DrawnPlan.beforeRead(pageIndex: 0, regions: [region], cropBox: cropBox,
+                                               rotation: page.rotation, switchOn: false, exportDPI: 300,
+                                               fillColor: settings.fillColor)
+            .stamped(pageVersion: 1, fromStoredRegions: true))
+        #expect(state.shownDPIs[0] == 300, "a page drawn while its read is asked for notes the quality it was shown at")
+        let passes = overlay.boxLayers.boxPassCount
+
+        // The pass asked for the read; once it is held the page redraws.
+        for _ in 0..<400 where documentState.pageReads[0] == nil {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        let read = try #require(documentState.pageReads[0], "the pass asked for the page's read, and it is held")
+        overlay.boxLayers.applyPendingPass()
+        #expect(overlay.boxLayers.boxPassCount > passes, "the read's arrival redraws the page")
+        let kept = try #require(state.drawnPlans[0])
+        #expect(!kept.madeWithoutRead, "the plan is made again with the read")
+        #expect(kept == DrawnPlan(pageIndex: 0, regions: [region], cropBox: cropBox, rotation: page.rotation,
+                                  switchOn: false, exportDPI: 300, fillColor: settings.fillColor, read: read)
+            .stamped(pageVersion: 1, fromStoredRegions: true))
+        withExtendedLifetime((coordinator, window)) {}
     }
 
     @Test("Under the cap of 150 a drawn page keeps its plan at 150, the quality the run uses")

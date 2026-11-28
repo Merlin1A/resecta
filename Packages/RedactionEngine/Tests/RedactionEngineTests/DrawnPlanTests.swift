@@ -98,6 +98,20 @@ struct DrawnPlanTests {
         #expect(base != Self.drawn(Array(regions.dropLast(2))))
     }
 
+    @Test("A page drawn before its read keeps the plan made as placed with no read, marked as made without it")
+    func beforeTheRead() throws {
+        let regions = Self.regions()
+        let before = DrawnPlan.beforeRead(pageIndex: 0, regions: regions, cropBox: Self.letter, rotation: 0,
+                                          switchOn: true, exportDPI: 300, fillColor: .black)
+        let placed = Self.drawn(regions, switchOn: true, source: .asPlaced)
+        #expect(before.madeWithoutRead)
+        #expect(!placed.madeWithoutRead && !Self.drawn(regions).madeWithoutRead)
+        #expect(before.plan == placed.plan && before.boxes == placed.boxes && before.filledPixels == placed.filledPixels)
+        #expect(before.switchOn && before.exportDPI == 300 && before.fillColor == .black)
+        #expect(before != placed, "the mark tells it from a plan made with the page's read")
+        #expect(before.stamped(pageVersion: 3, fromStoredRegions: true).madeWithoutRead, "kept, it stays marked")
+    }
+
     @Test("A page whose side cannot be read has no plan and draws no box")
     func unreadableSide() {
         for side in [CGSize(width: 0, height: 792), CGSize(width: 612, height: -1), CGSize(width: CGFloat.nan, height: 792)] {
