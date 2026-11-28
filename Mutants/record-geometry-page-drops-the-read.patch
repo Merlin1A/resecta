@@ -1,0 +1,20 @@
+Property: The run entry's page, made from the page's geometry, hands the page's read to its plan, so with a read and either switch state it has the same plan as the page made from its crop box.
+Area: the run's record (RunRecord.Page, the initialiser from the page's geometry)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter SwitchThroughTheRecordTests
+Must go red: RedactionEngineTests/SwitchThroughTheRecordTests runEntryPageCarriesTheInkChecksInputs
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+index 0ae9440da..939b661bd 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+@@ -112,8 +112,7 @@ public struct RunRecord: Equatable, Sendable {
+                     geometryAtStore: RunRecord.PageGeometry?, switchOn: Bool, read: PageRead? = nil,
+                     shownDPI: Int? = nil) {
+             let planned = Page(pageIndex: pageIndex, regions: regions,
+-                               cropBox: geometry.cropBox.size, rotation: geometry.rotation, switchOn: switchOn,
+-                               read: read)
++                               cropBox: geometry.cropBox.size, rotation: geometry.rotation, switchOn: switchOn)
+             self.init(pageIndex: pageIndex, regions: regions, plan: planned.plan,
+                       geometry: geometry, geometryAtStore: geometryAtStore, shownDPI: shownDPI,
+                       inkCheckInputs: planned.inkCheckInputs, defaultFallbacks: planned.defaultFallbacks)
