@@ -1,0 +1,24 @@
+Property: Where the sum x + w still misses k₁, the share's fourth step moves m one more double toward k₁, in the sum's direction. Here the fourth step is left out.
+Area: the first edit's start (engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'FirstEditStartTests'
+Must go red: RedactionEngineTests/FirstEditStartTests stepFourEdgesReadBack; RedactionEngineTests/FirstEditStartTests roundTripOnLetterAndA4; RedactionEngineTests/FirstEditStartTests roundTripOnOtherSides
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
+index 1bb9af39c..3995b542c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
+@@ -101,12 +101,7 @@ package enum FirstEditStartRule {
+         if Int((x * s).rounded(.down)) != k0 { x = x.nextUp }
+         var m = hi / s
+         if Int((m * s).rounded(.up)) != k1 { m = m * s > hi ? m.nextDown : m.nextUp }
+-        var w = m - x
+-        let sum = (x + w) * s
+-        if Int(sum.rounded(.up)) != k1 {
+-            m = sum > hi ? m.nextDown : m.nextUp
+-            w = m - x
+-        }
++        let w = m - x
+         return (x, w)
+     }
+ }

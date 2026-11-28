@@ -164,10 +164,12 @@ public struct RunRecord: Equatable, Sendable {
         /// The plan as `makePlan` makes it, with what the ink check reads for
         /// each box it may judge: the box's line height and the boxes of the
         /// page's words no box selects or covers. Inputs only with a read and
-        /// under the switch's policy.
+        /// under the switch's policy. With them, each region's first-edit
+        /// start, as the plan's maker works it out.
         package static func makePlanAndInputs(regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
                                               read: PageRead?, source: PlanSource)
-            -> (plan: PaintPlan, inputs: [Int: InkCheckInputs], fallbacks: [Int: PaintedBox])? {
+            -> (plan: PaintPlan, inputs: [Int: InkCheckInputs], fallbacks: [Int: PaintedBox],
+                starts: [UUID: PlannedStart])? {
             let turned = ((rotation % 360) + 360) % 180 != 0
             guard let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
                   let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height))
@@ -182,17 +184,18 @@ public struct RunRecord: Equatable, Sendable {
                     regions: planRegions, words: read.words, text: read.text, facts: read.facts,
                     widthSixtyFourths: width, heightSixtyFourths: height,
                     policy: .release, source: choice.source, switchOn: choice.switchOn)
-                guard choice.source == .switchPolicy else { return (made.plan, [:], [:]) }
+                guard choice.source == .switchPolicy else { return (made.plan, [:], [:], made.facts.firstEditStarts) }
                 let inputs = made.facts.inkLineHeights.mapValues {
                     InkCheckInputs(lineHeight: $0, others: made.facts.otherWords)
                 }
-                return (made.plan, inputs, made.facts.defaultFallbacks)
+                return (made.plan, inputs, made.facts.defaultFallbacks, made.facts.firstEditStarts)
             }
-            return (PaintPlan.make(
+            let made = PaintPlan.make(
                 regions: planRegions, words: PageWords(words: []), text: "",
                 facts: .noPageRead,
                 widthSixtyFourths: width, heightSixtyFourths: height,
-                policy: .release, source: choice.source, switchOn: choice.switchOn).plan, [:], [:])
+                policy: .release, source: choice.source, switchOn: choice.switchOn)
+            return (made.plan, [:], [:], made.facts.firstEditStarts)
         }
 
         package init(pageIndex: Int, regions: [DrawnRegion], plan: PaintPlan?,

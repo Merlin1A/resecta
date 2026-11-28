@@ -1,0 +1,19 @@
+Property: Clause 3 needs every other region's tight top and bottom to equal the region's own. Here the level test is removed.
+Area: the first edit's start (engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'FirstEditStartTests'
+Must go red: RedactionEngineTests/FirstEditStartTests tableCase
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
+index 1bb9af39c..affd2bdc2 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
+@@ -53,7 +53,7 @@ package enum FirstEditStartRule {
+                        neighbourTights: [PageRect64], oneLineBox: Bool) -> (rect: PageRect64, clause: Int) {
+         if neighbours.isEmpty { return (paint, 1) }
+         if neighbours.contains(where: { $0.contains(own) && $0 != own }) { return (own, 2) }
+-        if oneLineBox, neighbourTights.allSatisfy({ $0.minY == tight.minY && $0.maxY == tight.maxY }) {
++        if oneLineBox {
+             var right = paint.maxX
+             for n in neighbours where n.maxX > own.maxX { right = Swift.min(right, Swift.max(own.maxX, n.minX)) }
+             var left = paint.minX

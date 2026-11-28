@@ -5,10 +5,11 @@ Must go red: RedactionEngineTests/DrawnPlanTests asPlacedDrawsTheRegion
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+index c037955cc..53c7fa9f4 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
-@@ -145,8 +145,8 @@ public struct DrawnPlan: Equatable, Sendable {
-         guard let plan else { boxes = []; return }
+@@ -201,8 +201,8 @@ public struct DrawnPlan: Equatable, Sendable {
+         self.starts = starts.mapValues { Self.firstEditStart($0, plan: plan) }
          let w = Double(plan.widthSixtyFourths), h = Double(plan.heightSixtyFourths)
          func share(_ r: PageRect64) -> CGRect {
 -            CGRect(x: Double(r.minX) / w, y: Double(r.minY) / h,
