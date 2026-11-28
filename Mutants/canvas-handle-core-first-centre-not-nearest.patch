@@ -1,0 +1,26 @@
+Property: In two handle cores at once, the nearest handle takes the touch. Planted: the first in the list of handles takes it.
+Area: the canvas, the selected box's handle core
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasHandleCoreTests
+Must go red: ResectaAppTests/CanvasHandleCoreTests tableRow
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
+index 776d6ef..9ff800e 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
+@@ -304,13 +304,8 @@ extension RedactionOverlayView {
+     ) -> CanvasHitTarget? {
+         if let selected, let coreSize,
+            let core = handleCentres(for: selected.rect, fingerScale: fingerScale)
+-               .filter({ CGRect(x: $0.1.x - coreSize / 2, y: $0.1.y - coreSize / 2,
+-                                width: coreSize, height: coreSize).contains(point) })
+-               .min(by: { lhs, rhs in
+-                   let ldx = lhs.1.x - point.x, ldy = lhs.1.y - point.y
+-                   let rdx = rhs.1.x - point.x, rdy = rhs.1.y - point.y
+-                   return (ldx * ldx + ldy * ldy) < (rdx * rdx + rdy * rdy)
+-               }) {
++               .first(where: { CGRect(x: $0.1.x - coreSize / 2, y: $0.1.y - coreSize / 2,
++                                      width: coreSize, height: coreSize).contains(point) }) {
+             guard selected.rect.contains(point) else { return .handle(core.0) }
+             return resolveResizeHandle(
+                 at: point, regionRect: selected.rect, targetHandleSize: handleSize,
