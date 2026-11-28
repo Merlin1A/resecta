@@ -97,8 +97,6 @@ nonisolated final class CanvasRegionAccessibilityUITests: XCTestCase {
     /// A box on a fit page, then the page pinched larger: the box's element
     /// must be on the box at its new size and place.
     func testABoxsElementStaysOnTheBoxAfterAPinch() throws {
-        let toast = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Text layer detected'")).firstMatch
-        if toast.waitForExistence(timeout: 4) { _ = toast.waitForNonExistence(timeout: 20) }
         sleep(1)
         let page = try XCTUnwrap(try probe().fitPage(), "the page at fit is measurable")
 

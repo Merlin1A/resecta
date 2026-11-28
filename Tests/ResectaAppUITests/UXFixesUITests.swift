@@ -349,7 +349,7 @@ private extension UXFixesUITests {
     }
 
     /// Home → "Try the Sample" → the editor on page 1 of the 3-page sample,
-    /// once the text-layer toast has cleared so no drag lands on it.
+    /// settled a second so the first drag lands on the page.
     nonisolated func launchSampleInEditor() {
         app.launchArguments = ["--uitesting"]
         app.launch()
@@ -359,12 +359,6 @@ private extension UXFixesUITests {
         XCTAssertTrue(sampleCard.waitForExistence(timeout: 30), "HomeView's sample card never appeared.")
         sampleCard.tap()
         XCTAssertTrue(app.buttons["drawTool"].waitForExistence(timeout: 30), "The editor never appeared.")
-        let toast = app.staticTexts
-            .matching(NSPredicate(format: "label BEGINSWITH 'Text layer detected'"))
-            .firstMatch
-        if toast.waitForExistence(timeout: 5) {
-            XCTAssertTrue(toast.waitForNonExistence(timeout: 20), "The text-layer toast never cleared.")
-        }
         sleep(1)
     }
 

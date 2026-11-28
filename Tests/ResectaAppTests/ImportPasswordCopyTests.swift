@@ -42,15 +42,16 @@ struct ImportPasswordCopyTests {
                 == "The password was accepted, but the document could not be read in full with it, so it was not opened.")
     }
 
-    @Test("The encrypted-source toast: the restrictions line, the plain line, nothing for a plain source")
-    func encryptedSourceToast() {
-        #expect(RedactWorkspaceView.encryptedSourceToast(
-            facts: ImportFacts.Summary(origin: .pdf, wasEncrypted: true, hadRestrictions: true))
+    @Test("The source note: the restrictions sentence, the plain sentence, nothing for a plain source")
+    func encryptedSourceNote() {
+        func words(_ facts: ImportFacts.Summary) -> String? {
+            RedactWorkspaceView.encryptedSourceNote(facts: facts).map { MessageCatalog.row(for: $0).text }
+        }
+        #expect(words(ImportFacts.Summary(origin: .pdf, wasEncrypted: true, hadRestrictions: true))
             == "This PDF carries usage restrictions set with an owner password. The redacted copy is built without a password and without those restrictions.")
-        #expect(RedactWorkspaceView.encryptedSourceToast(
-            facts: ImportFacts.Summary(origin: .pdf, wasEncrypted: true, hadRestrictions: false))
+        #expect(words(ImportFacts.Summary(origin: .pdf, wasEncrypted: true, hadRestrictions: false))
             == "This PDF was password-protected. The redacted copy is built without a password.")
-        #expect(RedactWorkspaceView.encryptedSourceToast(facts: ImportFacts.Summary()) == nil)
+        #expect(RedactWorkspaceView.encryptedSourceNote(facts: ImportFacts.Summary()) == nil)
     }
 
     @Test("The Share-card caption")

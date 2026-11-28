@@ -92,12 +92,6 @@ nonisolated final class TurnedPageBoxUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["drawTool"].waitForExistence(timeout: 30),
                       "The editor never opened the turned fixture — check the --turnedDoc launch hook.")
-        let toast = app.staticTexts
-            .matching(NSPredicate(format: "label BEGINSWITH 'Text layer detected'"))
-            .firstMatch
-        if toast.waitForExistence(timeout: 5) {
-            XCTAssertTrue(toast.waitForNonExistence(timeout: 20), "The text-layer toast never cleared.")
-        }
         sleep(1)
     }
 

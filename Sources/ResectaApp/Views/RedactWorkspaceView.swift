@@ -49,16 +49,13 @@ struct RedactWorkspaceView: View {
 
     var body: some View {
         navigationContainer
-            // Fire the import-completion toasts when a new document is
-            // loaded, for EVERY import path. The Home -> redact load
-            // (openRedactWithDocument) runs its import in AppCoordinator AFTER
-            // this view mounts, so the in-view post-import calls never covered
-            // it — keying off the document swap covers all paths uniformly.
+            // A new document's arrival, for EVERY import path. The Home ->
+            // redact load (openRedactWithDocument) runs its import in
+            // AppCoordinator AFTER this view mounts, so the in-view
+            // post-import calls never covered it — keying off the document
+            // swap covers all paths uniformly.
             .onChange(of: workspace.documentState.sourceDocument) { oldDocument, newDocument in
-                if Self.isDocumentSwap(from: oldDocument, to: newDocument) {
-                    workspace.coordinator.documentDidChange()
-                    checkImportToasts()
-                }
+                Self.documentChanged(from: oldDocument, to: newDocument, workspace: workspace, toastManager: toastManager)
             }
             // Drag and drop. The dropped file is read inside its transfer
             // (size on disk first, then the bytes), so an oversized drop
@@ -216,18 +213,17 @@ struct RedactWorkspaceView: View {
     /// `activeImportTask` slot.
     private func startDropImport(_ dropped: DroppedDocument, droppedCount: Int) {
         activeImportDispatch?.cancel()
-        if droppedCount > 1 {
-            toastManager.post(.droppedFilesFirstOpened(count: droppedCount))
-        }
         let workspace = workspace
         activeImportDispatch = Task {
-            await Self.importDrop(dropped, workspace: workspace)
+            await Self.importDrop(dropped, droppedCount: droppedCount, workspace: workspace)
         }
     }
 
     /// The drop's import. The phase admission has already passed; the
-    /// import reads the bytes again before any parse.
-    static func importDrop(_ dropped: DroppedDocument, workspace: RedactWorkspace) async {
+    /// import reads the bytes again before any parse. The dropped-files
+    /// note is set only once the document has arrived (the arrival resets
+    /// every note), or, for a locked document, once its password opens it.
+    static func importDrop(_ dropped: DroppedDocument, droppedCount: Int = 1, workspace: RedactWorkspace) async {
         switch dropped.payload {
         case .bytes(let data):
             let outcome = await ImportService.importDocument(
@@ -235,11 +231,17 @@ struct RedactWorkspaceView: View {
                 documentState: workspace.documentState,
                 redactionState: workspace.redactionState
             )
+            switch outcome {
+            case .completed:
+                noteDroppedFiles(droppedCount, documentState: workspace.documentState)
             // A locked document waits for its password; the sheet
             // presents over the failed state, the prior document intact
             // beneath it.
-            if case .needsPassword(let hold) = outcome {
+            case .needsPassword(var hold):
+                hold.droppedCount = droppedCount
                 workspace.lockedImport = hold
+            case .refused:
+                break
             }
         case .refused(let failure):
             // The door met the refusal before any byte was read (a file
@@ -292,7 +294,7 @@ struct RedactWorkspaceView: View {
         )
     }
 
-    // MARK: - Toast Helpers
+    // MARK: - A document's arrival and its notes
 
     /// A new document replaced the one shown, or arrived in an empty
     /// workspace. Its one writer is `ImportService.apply`, so this holds
@@ -303,47 +305,46 @@ struct RedactWorkspaceView: View {
         newDocument != nil && newDocument !== oldDocument
     }
 
-    /// The import-completion toasts: the text-layer notice, for a source
-    /// that was encrypted what the redacted copy will carry, and for an
-    /// image import how its pages are read.
-    private func checkImportToasts() {
-        checkTextLayerToast()
-        checkEncryptedSourceToast()
-        checkImageSourceToast()
+    /// The dropped-files note: set when more than one file was dropped and
+    /// the first has arrived. Never before the import.
+    static func noteDroppedFiles(_ count: Int, documentState: DocumentState) {
+        if count > 1 { documentState.droppedFilesNoteCount = count }
     }
 
-    /// The notice for an image import, once per import, never for a PDF:
-    /// the pages are read by text recognition and codes are not decoded.
-    /// Static so the string is pinned.
-    static func imageSourceToast(facts: ImportFacts.Summary) -> String? {
+    /// What VoiceOver says when a document has arrived.
+    static let documentOpenedLine = "Document opened."
+
+    /// A document swap: the coordinator's per-document reset, then the
+    /// arrival said to VoiceOver once. A return to the editor keeps the
+    /// document and Start Over clears it; neither is a swap, so neither
+    /// says it. (A source that was encrypted, an image import and a drop of
+    /// several files have their notes in the editor's band,
+    /// `TopBannerSlot.documentNotes`.)
+    static func documentChanged(from oldDocument: PDFDocument?, to newDocument: PDFDocument?,
+                                workspace: RedactWorkspace, toastManager: ToastQueueManager) {
+        guard isDocumentSwap(from: oldDocument, to: newDocument) else { return }
+        workspace.coordinator.documentDidChange()
+        toastManager.announce(documentOpenedLine)
+    }
+
+    /// The note for an image import, never for a PDF: the pages are read by
+    /// text recognition and codes are not decoded. Static so the rule is
+    /// pinned.
+    static func imageSourceNote(facts: ImportFacts.Summary) -> MessageID? {
         guard case .images = facts.origin else { return nil }
-        return imageSourceMessage
+        return .imagePagesNote
     }
 
-    /// The image import's notice, raised by `imageSourceToast(facts:)`'s rule.
+    /// The image import's note, drawn by `imageSourceNote(facts:)`'s rule.
     static let imageSourceMessage =
         "Image pages are read with on-device text recognition. Barcodes and QR codes are not read."
 
-    private func checkImageSourceToast() {
-        guard workspace.documentState.phaseKind == .editing,
-              Self.imageSourceToast(facts: workspace.documentState.sourceFacts) != nil else { return }
-        toastManager.post(.imagePagesNote)
-    }
-
-    /// Notify user when text layer detected after import.
-    private func checkTextLayerToast() {
-        if workspace.documentState.hasAnyTextLayer,
-           workspace.documentState.phaseKind == .editing {
-            toastManager.post(.textLayerDetected)
-        }
-    }
-
-    /// The copy for an encrypted source at import: the restrictions line
-    /// when the owner withheld a permission, else the plain line; nil when
-    /// the source was not encrypted. Static so the strings are pinned.
-    static func encryptedSourceToast(facts: ImportFacts.Summary) -> String? {
+    /// The note for an encrypted source: the restrictions line when the
+    /// owner withheld a permission, else the plain line; nil when the
+    /// source was not encrypted. Static so the rule is pinned.
+    static func encryptedSourceNote(facts: ImportFacts.Summary) -> MessageID? {
         guard facts.wasEncrypted else { return nil }
-        return encryptedSourceMessage(hadRestrictions: facts.hadRestrictions)
+        return .encryptedSource(hadRestrictions: facts.hadRestrictions)
     }
 
     /// The encrypted source's two lines: with the restrictions, or plain.
@@ -351,13 +352,6 @@ struct RedactWorkspaceView: View {
         hadRestrictions
             ? "This PDF carries usage restrictions set with an owner password. The redacted copy is built without a password and without those restrictions."
             : "This PDF was password-protected. The redacted copy is built without a password."
-    }
-
-    private func checkEncryptedSourceToast() {
-        let facts = workspace.documentState.sourceFacts
-        guard workspace.documentState.phaseKind == .editing,
-              Self.encryptedSourceToast(facts: facts) != nil else { return }
-        toastManager.post(.encryptedSource(hadRestrictions: facts.hadRestrictions))
     }
 
     // MARK: - The locked import
@@ -386,7 +380,10 @@ struct RedactWorkspaceView: View {
             var phaseError: PipelineError?
             if case .failed(let error, _) = workspace.documentState.phase { phaseError = error }
             switch ImportPasswordFlow.step(after: outcome, phaseError: phaseError, hold: hold) {
-            case .opened, .refusedForAnotherReason:
+            case .opened:
+                workspace.lockedImport = nil
+                Self.noteDroppedFiles(hold.droppedCount, documentState: workspace.documentState)
+            case .refusedForAnotherReason:
                 workspace.lockedImport = nil
             case .wrongPassword(let next), .cannotOpen(let next):
                 workspace.lockedImport = next

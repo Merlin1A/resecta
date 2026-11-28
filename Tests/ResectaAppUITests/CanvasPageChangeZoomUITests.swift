@@ -18,8 +18,6 @@ nonisolated final class CanvasPageChangeZoomUITests: XCTestCase {
         app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
         app.launch()
         XCTAssertTrue(app.buttons["drawTool"].waitForExistence(timeout: 60), "the editor never appeared")
-        let toast = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Text layer detected'")).firstMatch
-        if toast.waitForExistence(timeout: 4) { _ = toast.waitForNonExistence(timeout: 20) }
         sleep(1)
     }
 
